@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Binance Futures Alerts</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #282c34; color: #abb2bf; }
+        h1 { color: #61afef; }
+        #status { margin-bottom: 10px; padding: 5px; border-radius: 3px; }
+        .status-connected { background-color: #98c379; color: #282c34; }
+        .status-disconnected { background-color: #e06c75; color: #282c34; }
+        #alertsList { list-style: none; padding: 0; }
+        .alert { background-color: #323842; border-left: 5px solid #e06c75; margin-bottom: 10px; padding: 15px; border-radius: 3px; }
+        .alert-symbol { font-weight: bold; color: #e5c07b; text-decoration: none; } /* Добавил text-decoration: none для ссылки */
+        .alert-symbol:hover { text-decoration: underline; } /* Подчеркивание при наведении */
+        .alert-details { font-size: 0.9em; color: #abb2bf; margin-top: 5px; }
+        .alert-time { font-size: 0.8em; color: #56b6c2; float: right; }
+        #enableSoundButton { margin-top: 10px; padding: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Уведомления Binance Futures</h1>
+    <div id="status">Подключение...</div>
+    <ul id="alertsList"></ul>
+
+    <hr> <button onclick="playSoundTest()">Проверить Звук (Тест)</button>
+    <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio> 
+    
+    <script>
+        // Функция для тестовой кнопки
+        function playSoundTest() {
+            console.log("НАЖАТА КНОПКА 'Проверить Звук'");
+            const testPlayer = document.getElementById('testAudioPlayer');
+            if (testPlayer) {
+                testPlayer.play()
+                    .then(() => { 
+                        console.log("Тестовый звук (с кнопки) УСПЕШНО воспроизведен!"); 
+                        alert("Звук с кнопки должен был проиграться!"); 
+                    })
+                    .catch(error => { 
+                        console.error("Ошибка тестового воспроизведения звука (с кнопки):", error); 
+                        alert("Ошибка звука с кнопки: " + error.name + " - " + error.message);
+                    });
+            } else {
+                console.error("Тестовый плеер #testAudioPlayer не найден!");
+            }
+        }
+    </script>
+
+    <script>
+        // Основной скрипт приложения
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("ОСНОВНОЙ СКРИПТ: DOMContentLoaded сработал.");
+
+            const alertsList = document.getElementById("alertsList");
+            const statusDiv = document.getElementById("status");
+            let socket;
+
+            const alertSound = new Audio('alert.wav'); 
+            alertSound.preload = 'auto';
+
+            function connect() {
+                const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const wsUrl = `${wsProtocol}//${window.location.host}/ws/alerts`;
+                
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = function(event) {
+                    statusDiv.textContent = "Подключено к серверу алертов.";
+                    statusDiv.className = "status-connected";
+                };
+
+                socket.onmessage = function(event) {
+                    try {
+                        const alertData = JSON.parse(event.data);
+                        displayAlert(alertData);
+
+                        alertSound.play()
+                            .then(() => {
+                            })
+                            .catch(error => {
+                                console.error("!!!!! ОСНОВНОЙ СКРИПТ: alertSound.play() НЕ УДАЛОСЬ:", error.name, error.message);
+                                
+                                if (!document.getElementById('enableSoundButton')) {
+                                    const enableSoundButton = document.createElement('button');
+                                    enableSoundButton.id = 'enableSoundButton';
+                                    enableSoundButton.textContent = 'Включить звук уведомлений';
+                                    enableSoundButton.onclick = () => {
+                                        alertSound.play().then(() => {
+                                            enableSoundButton.style.display = 'none';
+                                        }).catch(e => console.error("ОСНОВНОЙ СКРИПТ: Ошибка при активации звука пользователем через кнопку:", e));
+                                    };
+                                    
+                                    if (statusDiv && statusDiv.parentNode) {
+                                        statusDiv.parentNode.insertBefore(enableSoundButton, statusDiv.nextSibling);
+                                    } else {
+                                        document.body.appendChild(enableSoundButton); // Запасной вариант
+                                    }
+                                }
+                            });
+                    } catch (e) {
+                        console.error("ОСНОВНОЙ СКРИПТ: Ошибка парсинга JSON или в displayAlert:", e);
+                    }
+                };
+
+                socket.onerror = function(error) {
+                    console.error("ОСНОВНОЙ СКРИПТ: WebSocket onerror:", error);
+                    statusDiv.textContent = "Ошибка WebSocket (alerts).";
+                    statusDiv.className = "status-disconnected";
+                };
+
+                socket.onclose = function(event) {
+                    console.log("ОСНОВНОЙ СКРИПТ: WebSocket onclose. Код:", event.code, "Причина:", event.reason, "Было чисто:", event.wasClean);
+                    statusDiv.textContent = "Отключено от сервера алертов. Попытка переподключения через 5 сек...";
+                    statusDiv.className = "status-disconnected";
+                    setTimeout(connect, 5000);
+                };
+            }
+
+            function displayAlert(data) {
+							if (!alertsList) { /* ... проверка alertsList ... */ return; }
+							if (!data || !data.symbol) { /* ... проверка data ... */ return; }
+
+							const listItem = document.createElement("li");
+							listItem.classList.add("alert");
+
+							const eventTime = new Date(data.timestamp).toLocaleString('ru-RU');
+
+							const originalBinanceTicker = data.symbol;
+							const tickerForTradingViewUrl = `${originalBinanceTicker}.P`;
+							const tradingViewSymbolParam = `BINANCE:${tickerForTradingViewUrl}`;
+							const tradingViewUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tradingViewSymbolParam)}`;
+
+							// console.log(`displayAlert: Формирование ссылки для ${originalBinanceTicker} -> ${tradingViewUrl}`);
+
+							let movementText = "";
+							let movementClass = "";
+
+							if (data.percentageChange > 0) {
+									movementText = `вырос на <strong>${data.percentageChange.toFixed(2)}%</strong>`;
+									movementClass = "price-rise";
+							} else if (data.percentageChange < 0) {
+									movementText = `упал на <strong>${Math.abs(data.percentageChange).toFixed(2)}%</strong>`; // Используем Math.abs для отображения
+									movementClass = "price-fall";
+							} else {
+									// Этот случай маловероятен для алерта, но для полноты
+									movementText = "не изменился"; 
+									movementClass = "price-neutral";
+							}
+
+							listItem.classList.add(movementClass); 
+							if (movementClass === "price-rise") listItem.style.borderLeftColor = "#98c379"; // зеленый
+							if (movementClass === "price-fall") listItem.style.borderLeftColor = "#e06c75"; // красный
+
+							listItem.innerHTML = `
+									<span class="alert-time">${eventTime}</span>
+									<div>
+											<strong>ВНИМАНИЕ!</strong> 
+											<a href="${tradingViewUrl}" target="_blank" class="alert-symbol" title="Открыть график ${tickerForTradingViewUrl} на TradingView">${originalBinanceTicker}</a> 
+											${movementText}!
+									</div>
+									<div class="alert-details">
+											Текущая цена: ${data.currentPrice.toFixed(4)}, Старая цена в окне: ${data.oldestPrice.toFixed(4)}
+									</div>
+							`;
+
+							alertsList.prepend(listItem);
+
+							while (alertsList.children.length > 50) {
+									alertsList.removeChild(alertsList.lastChild);
+							}
+						}
+            
+            connect();
+        });
+    </script>
+</body>
+</html>

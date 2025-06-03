@@ -76,7 +76,7 @@
 
 Находясь в **корневой директории** вашего проекта:
 <!-- ```bash -->
-go run ./cmd/futuresalerter/main.go
+go run ./cmd/main.go
 
 
 ### С помощью Docker

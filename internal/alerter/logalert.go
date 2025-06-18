@@ -1,10 +1,8 @@
-// internal/alerter/logalerter.go
 package alerter
 
 import (
 	"log"
-	"math" // Нужен для math.Abs
-	// "project_name/internal/analysis" // Не нужен здесь, если интерфейс в analysis
+	"math"
 )
 
 type LogAlerter struct{}

@@ -12,14 +12,12 @@ type AlertMessage struct {
 	Timestamp        time.Time `json:"timestamp"`
 }
 
-// Структура для запроса на подписку/отписку к WebSocket серверу
 type WebSocketRequest struct {
 	Method string   `json:"method"`
 	Params []string `json:"params"`
 	ID     int      `json:"id"`
 }
 
-// MiniTicker представляет данные одного тикера из потока !miniTicker@arr
 type MiniTicker struct {
 	Symbol      string `json:"s"` // Symbol
 	ClosePrice  string `json:"c"` // Close price
@@ -32,7 +30,6 @@ type MiniTicker struct {
 	EventTime   int64  `json:"E"` // Event time
 }
 
-// PricePoint хранит цену и временную метку для анализа истории
 type PricePoint struct {
 	Timestamp int64   // Unix миллисекунды
 	Price     float64 // Цена

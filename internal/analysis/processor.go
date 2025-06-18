@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// Alerter интерфейс для отправки уведомлений
 type Alerter interface {
 	Alert(symbol string, percentageChange float64, currentPrice float64, oldestPrice float64)
 }
@@ -34,7 +33,6 @@ func NewPriceProcessor(cfg *config.AppConfig, alerter Alerter) *PriceProcessor {
 	}
 }
 
-// Process принимает срез MiniTicker и выполняет анализ
 func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 	pp.historyMutex.Lock()
 	defer pp.historyMutex.Unlock()
@@ -82,19 +80,14 @@ func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 
 				alertConditionMet := false
 				
-				// Проверяем РОСТ
 				if percentageChange > pp.config.PercentageThreshold {
 					alertConditionMet = true
-				} else if percentageChange < -pp.config.PercentageThreshold { // Проверяем ПАДЕНИЕ
-					// percentageChange уже будет отрицательным, например -2.5%
-					// -pp.config.PercentageThreshold будет, например, -1.0% (если PercentageThreshold = 1.0)
-					// Условие -2.5 < -1.0 будет истинным.
+				} else if percentageChange < -pp.config.PercentageThreshold {
 					alertConditionMet = true
 				}
 
 				if alertConditionMet {
 					if lastAlertTs, alerted := pp.lastAlertTimestamp[ticker.Symbol]; !alerted || (currentTimeMillis-lastAlertTs > pp.config.AlertCooldown.Milliseconds()) {
-						// Передаем percentageChange как есть (он будет положительным для роста, отрицательным для падения)
 						pp.alerter.Alert(ticker.Symbol, percentageChange, currentPriceFloat, oldestPointInWindow.Price)
 						pp.lastAlertTimestamp[ticker.Symbol] = currentTimeMillis
 					}

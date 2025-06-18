@@ -1,4 +1,3 @@
-// cmd/futuresalerter/main.go
 package main
 
 import (
@@ -6,7 +5,7 @@ import (
 	"binance/internal/analysis"
 	"binance/internal/config"
 	"binance/internal/models"
-	websocketclient "binance/internal/webSocketClient" // Убедитесь, что это правильный путь
+	websocketclient "binance/internal/webSocketClient"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,7 +17,7 @@ import (
 	"sync"
 )
 
-// setupApplication остается примерно таким же
+
 func setupApplication(cfg *config.AppConfig) (*analysis.PriceProcessor, *alerter.WebAlerter, chan os.Signal) {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -31,7 +30,6 @@ func setupApplication(cfg *config.AppConfig) (*analysis.PriceProcessor, *alerter
 	return priceProcessor, webAlerter, interrupt
 }
 
-// startHTTPServer остается таким же
 func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir("./static"))
@@ -52,26 +50,21 @@ func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	return httpServer
 }
 
-// Новая функция для установки соединения и подписки
 func connectAndSubscribeBinance(cfg *config.AppConfig) (*websocketclient.Client, *models.WebSocketRequest, error) {
 	client, err := websocketclient.New(cfg.FuturesWebSocketURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("создание WebSocket клиента Binance: %w", err)
 	}
 
-	// ID подписки можно делать уникальным при каждой попытке, если это необходимо,
-	// но для простоты пока оставляем 1.
 	subReq, err := client.Subscribe(cfg.StreamName, 1)
 	if err != nil {
-		client.Close() // Закрываем клиент, если подписка не удалась
+		client.Close()
 		return nil, nil, fmt.Errorf("подписка на поток Binance: %w", err)
 	}
 	log.Println("Успешная подписка на поток Binance для текущей сессии.")
 	return client, subReq, nil
 }
 
-// Новая функция для цикла обработки сообщений текущей сессии WebSocket
-// Возвращает ошибку, если обработка прервалась из-за ошибки соединения.
 func processBinanceMessages(
 	client *websocketclient.Client,
 	subReq *models.WebSocketRequest, // Для проверки ID ответа на подписку
@@ -130,12 +123,7 @@ func processBinanceMessages(
 	}
 }
 
-// Новая функция - менеджер соединения с Binance, который реализует цикл переподключения
-func runBinanceConnectionManager(
-	cfg *config.AppConfig,
-	priceProcessor *analysis.PriceProcessor,
-	appShutdownSignal chan struct{}, // Канал для сигнала о полном завершении приложения
-) {
+func runBinanceConnectionManager(cfg *config.AppConfig, priceProcessor *analysis.PriceProcessor, appShutdownSignal chan struct{}) {
 	log.Println("Менеджер соединения с Binance запущен.")
 	defer log.Println("Менеджер соединения с Binance остановлен.")
 

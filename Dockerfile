@@ -8,11 +8,6 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-# Собираем Go-приложение.
-# - CGO_ENABLED=0 отключает Cgo, что позволяет создавать статические бинарники (важно для маленьких образов типа Alpine/Scratch)
-# - GOOS=linux собирает бинарник для Linux (так как финальный образ будет Alpine Linux)
-# -o /app/server указывает, что скомпилированный бинарник будет называться 'server' и находиться в /app/
-# Путь к вашему main пакету - ./cmd/ (если main.go внутри этой папки)
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /app/server ./cmd/
 
 FROM alpine:latest

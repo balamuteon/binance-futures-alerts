@@ -1,4 +1,3 @@
-// internal/alerter/webalerter.go
 package alerter
 
 import (
@@ -45,12 +44,8 @@ func (wa *WebAlerter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wa.clients[conn] = true
 	log.Printf("[WebAlerter] Новый веб-клиент подключен. Всего клиентов: %d", len(wa.clients))
 	wa.mu.Unlock()
-
-	// Примечание: здесь можно запустить go conn.ReadPump() если нужно обрабатывать сообщения от клиента.
-	// Сейчас мы только отправляем данные клиенту. Если клиент отключится, ошибка записи это обнаружит.
 }
 
-// Alert реализует интерфейс analysis.Alerter
 func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPrice float64, oldestPrice float64) {
 	msg := models.AlertMessage{
 		Symbol:           symbol,
@@ -66,15 +61,11 @@ func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPric
 	}
 }
 
-// runBroadcaster в отдельной горутине слушает канал broadcast и рассылает сообщения всем клиентам
 func (wa *WebAlerter) runBroadcaster() {
 	for alertMsg := range wa.broadcast {
 		wa.mu.Lock()
-		if len(wa.clients) > 0 { // Добавим проверку, что есть клиенты
-			// log.Printf("[WebAlerter] Рассылка алерта для %s клиентам (%d)", alertMsg.Symbol, len(wa.clients))
-		}
 		for client := range wa.clients {
-			err := client.WriteJSON(alertMsg) // Отправляем как JSON
+			err := client.WriteJSON(alertMsg)
 			if err != nil {
 				log.Printf("[WebAlerter] Ошибка записи JSON веб-клиенту: %v. Удаление клиента.", err)
 				client.Close()

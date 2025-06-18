@@ -12,10 +12,10 @@ type AppConfig struct {
 
 func Load() *AppConfig {
 	return &AppConfig{
-		FuturesWebSocketURL:  "wss://fstream.binance.com/ws",
-		StreamName:           "!miniTicker@arr",
-		PriceHistoryDuration: 1 * time.Minute,
-		PercentageThreshold:  0.3, // adjust this as needed
-		AlertCooldown:        30 * time.Second,
+		FuturesWebSocketURL:  "wss://fstream.binance.com/ws", // URL для WebSocket Binance Futures
+		StreamName:           "!miniTicker@arr",              // Имя стрима для получения мини-тикеров
+		PriceHistoryDuration: 1 * time.Minute,                // Длительность хранения истории цен, за которую будет производиться анализ
+		PercentageThreshold:  2,                              // Порог изменения цены в процентах(%) для срабатывания алерта
+		AlertCooldown:        30 * time.Second,               // Время ожидания перед следующей проверкой алерта для одного и того же тикера
 	}
 }

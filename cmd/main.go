@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"time"
+	"sync"
 )
 
 // setupApplication остается примерно таким же
@@ -230,20 +231,24 @@ func runBinanceConnectionManager(
 // Обновленная функция main
 func main() {
 	cfg := config.Load()
+	wg := sync.WaitGroup{}
 	priceProcessor, webAlerter, interruptChan := setupApplication(cfg)
 
 	// Канал для сигнализации менеджеру соединений Binance о полном завершении приложения
 	appShutdownSignalForBinanceMgr := make(chan struct{})
 
-	// Запускаем менеджер соединений Binance в отдельной горутине
-	go runBinanceConnectionManager(cfg, priceProcessor, appShutdownSignalForBinanceMgr)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runBinanceConnectionManager(cfg, priceProcessor, appShutdownSignalForBinanceMgr)		
+	}()
 
 	httpSrv := startHTTPServer(webAlerter)
 
 	log.Println("Приложение запущено. Для выхода нажмите Ctrl+C.")
-	<-interruptChan // Ожидаем сигнала Ctrl+C (SIGINT)
 
 	// --- Начало Graceful Shutdown ---
+	<-interruptChan
 	log.Println("Получен сигнал прерывания, начинаем graceful shutdown...")
 
 	// 1. Сигнализируем менеджеру соединений Binance о необходимости завершения
@@ -259,14 +264,8 @@ func main() {
 		log.Println("HTTP сервер остановлен.")
 	}
 
-	// Даем немного времени менеджеру соединений Binance на корректное закрытие своего клиента
-	// В более сложных системах можно использовать sync.WaitGroup для ожидания завершения горутин
-	log.Println("Ожидание завершения работы менеджера Binance (до 3 секунд)...")
-	select {
-	case <-time.After(3 * time.Second): // Ждем немного, но не блокируем навечно
-		log.Println("Таймаут ожидания менеджера Binance.")
-		// Можно добавить канал, сигнализирующий о завершении runBinanceConnectionManager, если нужно точное ожидание
-	}
+	log.Println("Ожидание завершения работы менеджера Binance")
+	wg.Wait()
 
 	log.Println("Приложение завершено.")
 }

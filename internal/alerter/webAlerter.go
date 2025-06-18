@@ -63,15 +63,27 @@ func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPric
 
 func (wa *WebAlerter) runBroadcaster() {
 	for alertMsg := range wa.broadcast {
+		// Шаг 1: Получаем "снимок" текущих клиентов под коротким замком
 		wa.mu.Lock()
+		// Создаем слайс, чтобы скопировать указатели на соединения
+		currentClients := make([]*websocket.Conn, 0, len(wa.clients))
 		for client := range wa.clients {
+			currentClients = append(currentClients, client)
+		}
+		wa.mu.Unlock() // <-- Немедленно освобождаем замок!
+
+		// Шаг 2: Итерируемся по "снимку", не блокируя подключение новых клиентов
+		for _, client := range currentClients {
+			// Для каждой отправки можно установить свой таймаут, чтобы не ждать вечно
+			// client.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			err := client.WriteJSON(alertMsg)
 			if err != nil {
 				log.Printf("[WebAlerter] Ошибка записи JSON веб-клиенту: %v. Удаление клиента.", err)
 				client.Close()
+				wa.mu.Lock()
 				delete(wa.clients, client)
+				wa.mu.Unlock()
 			}
 		}
-		wa.mu.Unlock()
 	}
 }

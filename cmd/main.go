@@ -13,12 +13,53 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
 	"sync"
+	"time"
 )
 
+func main() {
+	cfg := config.Load()
+	wg, priceProcessor, webAlerter, interruptChan := setupApplication(cfg)
 
-func setupApplication(cfg *config.AppConfig) (*analysis.PriceProcessor, *alerter.WebAlerter, chan os.Signal) {
+	// Канал для сигнализации менеджеру соединений Binance о полном завершении приложения
+	appShutdownSignalForBinanceMgr := make(chan struct{})
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runBinanceConnectionManager(cfg, priceProcessor, appShutdownSignalForBinanceMgr)
+	}()
+
+	httpSrv := startHTTPServer(webAlerter)
+
+	log.Println("Приложение запущено. Для выхода нажмите Ctrl+C.")
+
+	// --- Начало Graceful Shutdown ---
+	<-interruptChan
+	log.Println("Получен сигнал прерывания, начинаем graceful shutdown...")
+
+	// 1. Сигнализируем менеджеру соединений Binance о необходимости завершения
+	log.Println("Отправка сигнала завершения менеджеру соединения с Binance...")
+	close(appShutdownSignalForBinanceMgr)
+
+	// 2. Останавливаем HTTP сервер
+	ctxHttp, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelHttp()
+	if err := httpSrv.Shutdown(ctxHttp); err != nil {
+		log.Printf("Ошибка graceful shutdown HTTP сервера: %v", err)
+	} else {
+		log.Println("HTTP сервер остановлен.")
+	}
+
+	log.Println("Ожидание завершения работы менеджера Binance")
+	wg.Wait()
+
+	log.Println("Приложение завершено.")
+	time.Sleep(1 * time.Second)
+}
+
+func setupApplication(cfg *config.AppConfig) (*sync.WaitGroup, *analysis.PriceProcessor, *alerter.WebAlerter, chan os.Signal) {
+	wg := sync.WaitGroup{}
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
@@ -27,7 +68,7 @@ func setupApplication(cfg *config.AppConfig) (*analysis.PriceProcessor, *alerter
 	compositeAlerter := alerter.NewCompositeAlerter(logAlerter, webAlerter)
 	priceProcessor := analysis.NewPriceProcessor(cfg, compositeAlerter)
 
-	return priceProcessor, webAlerter, interrupt
+	return &wg, priceProcessor, webAlerter, interrupt
 }
 
 func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
@@ -36,17 +77,25 @@ func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	mux.Handle("/", fs)
 	mux.Handle("/ws/alerts", webAlerter)
 
-	httpServer := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
-	}
+	srv := newServer(mux)
 
 	log.Println("Запуск HTTP сервера на http://localhost:8080 ...")
 	go func() {
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Критическая ошибка HTTP сервера: %v", err)
 		}
 	}()
+	return srv
+}
+
+func newServer(mux *http.ServeMux) *http.Server {
+	httpServer := &http.Server{
+		Addr:           ":8080",
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
+	}
 	return httpServer
 }
 
@@ -127,133 +176,68 @@ func runBinanceConnectionManager(cfg *config.AppConfig, priceProcessor *analysis
 	log.Println("Менеджер соединения с Binance запущен.")
 	defer log.Println("Менеджер соединения с Binance остановлен.")
 
-	var currentClient *websocketclient.Client
-	var currentSessionDone chan struct{}
-
-	// Перед выходом из менеджера убедимся, что текущее соединение закрыто
-	defer func() {
-		if currentClient != nil {
-			log.Println("Менеджер Binance: закрытие клиента при выходе из менеджера...")
-			if currentSessionDone != nil {
-				close(currentSessionDone) // Сигнализируем обработчику сообщений остановиться
-			}
-			currentClient.Close()
-		}
-	}()
-
-	retryDelay := 5 * time.Second // Начальная задержка перед повторной попыткой
-
 	for {
-		// Проверяем, не нужно ли завершить работу менеджера
+		// Начальная проверка на выход, если сигнал пришел между сессиями
 		select {
 		case <-appShutdownSignal:
-			log.Println("Менеджер Binance: получен сигнал на полное завершение.")
+			log.Println("Менеджер Binance: получен сигнал на завершение перед новой попыткой.")
 			return
 		default:
-			// Продолжаем работу
 		}
 
-		log.Printf("Менеджер Binance: попытка подключения (следующая через ~%s, если была ошибка)...", retryDelay.String())
+		log.Printf("Менеджер Binance: попытка подключения...")
 		client, subReq, err := connectAndSubscribeBinance(cfg)
 		if err != nil {
-			log.Printf("Менеджер Binance: не удалось подключиться/подписаться: %v.", err)
-			// Ожидаем перед следующей попыткой, но также слушаем сигнал завершения
-			select {
-			case <-time.After(retryDelay):
-				if retryDelay < 60*time.Second { // Увеличиваем задержку, но не более минуты
-					retryDelay += 5 * time.Second
-				}
-				continue // Переходим к следующей итерации цикла for для новой попытки
-			case <-appShutdownSignal:
-				log.Println("Менеджер Binance: получен сигнал на полное завершение во время ожидания повторной попытки.")
-				return
-			}
+			log.Printf("Менеджер Binance: ошибка подключения: %v", err)
+			time.Sleep(5 * time.Second) // Простая задержка перед повторной попыткой
+			continue
 		}
 
-		// Успешное подключение
-		currentClient = client
-		currentSessionDone = make(chan struct{}) // Канал для управления текущей сессией
-		log.Println("Менеджер Binance: успешно подключен к Binance.")
-		retryDelay = 5 * time.Second // Сбрасываем задержку при успешном подключении
+		// --- НОВАЯ ЛОГИКА УПРАВЛЕНИЯ СЕССИЕЙ ---
 
-		// Запускаем обработку сообщений для этой сессии. Эта функция будет блокирующей.
-		// Она вернется, когда сессия завершится (из-за ошибки или сигнала appShutdownSignal).
-		processingErr := processBinanceMessages(currentClient, subReq, priceProcessor, currentSessionDone)
+		currentSessionDone := make(chan struct{})   // Канал для остановки именно этой сессии
+		processingResultChan := make(chan error, 1) // Канал для результата работы processBinanceMessages
 
-		// Сессия завершена, закрываем текущий клиент перед следующей попыткой (если она будет)
-		log.Println("Менеджер Binance: текущая сессия с Binance завершена. Закрытие клиента...")
-		currentClient.Close() // ReadMessages внутри processBinanceMessages должен завершиться из-за этого
-		currentClient = nil
-		// currentSessionDone уже должен был быть обработан или закрыт, если processingErr == nil
+		// Запускаем обработку сообщений в ДОЧЕРНЕЙ горутине
+		go func() {
+			log.Println("[Manager] Дочерняя горутина processBinanceMessages запущена.")
+			err := processBinanceMessages(client, subReq, priceProcessor, currentSessionDone)
+			processingResultChan <- err
+			log.Println("[Manager] Дочерняя горутина processBinanceMessages завершена.")
+		}()
 
-		if processingErr != nil {
-			log.Printf("Менеджер Binance: сессия завершилась с ошибкой: %v.", processingErr)
-			// Цикл for автоматически перейдет к следующей попытке подключения после задержки
-		} else {
-			// Если processingErr == nil, значит processBinanceMessages завершился по сигналу sessionDone.
-			// Это обычно происходит при штатном завершении приложения.
-			// Проверяем еще раз сигнал appShutdownSignal, чтобы не войти в бесконечный цикл переподключений при остановке.
-			select {
-			case <-appShutdownSignal:
-				log.Println("Менеджер Binance: подтверждено завершение после чистой остановки сессии.")
-				return
-			default:
-				// Если не было ошибки и не было сигнала на выход, возможно, что-то пошло не так
-				// или это был какой-то другой чистый выход. Продолжим с переподключением.
-				log.Println("Менеджер Binance: сессия завершилась без ошибки, но без сигнала на выход. Попытка переподключения...")
-			}
-		}
-		// Ожидаем перед следующей попыткой подключения
+		// Теперь менеджер СВОБОДЕН и может слушать сигналы в select
+		log.Println("[Manager] Ожидание завершения сессии или сигнала shutdown...")
+
 		select {
-		case <-time.After(retryDelay):
-			if retryDelay < 60*time.Second {
-				retryDelay += 5 * time.Second
+		case err := <-processingResultChan:
+			// Сессия завершилась сама по себе (из-за ошибки или обрыва связи)
+			if err != nil {
+				log.Printf("Менеджер Binance: сессия завершилась с ошибкой: %v", err)
+			} else {
+				log.Println("Менеджер Binance: сессия завершилась штатно.")
 			}
+			// Цикл for просто перейдет к следующей итерации и попробует переподключиться
+
 		case <-appShutdownSignal:
-			log.Println("Менеджер Binance: получен сигнал на полное завершение во время ожидания перед переподключением.")
-			return
+			// Пришел главный сигнал на завершение ВСЕГО приложения
+			log.Println("Менеджер Binance: получен глобальный сигнал shutdown. Завершение текущей сессии...")
+
+			// 1. Говорим `processBinanceMessages` остановиться
+			close(currentSessionDone)
+
+			// 2. Ждем, пока она действительно завершится и вернет результат
+			err := <-processingResultChan
+			log.Printf("Менеджер Binance: дочерняя горутина подтвердила остановку (результат: %v).", err)
+
+			// 3. Закрываем соединение и выходим из менеджера
+			client.Close()
+			return // Выход из runBinanceConnectionManager
 		}
+
+		// Закрываем клиент после каждой сессии перед переподключением
+		log.Println("Менеджер Binance: закрытие клиента после сессии...")
+		client.Close()
+		time.Sleep(5 * time.Second) // Пауза перед переподключением
 	}
-}
-
-// Обновленная функция main
-func main() {
-	cfg := config.Load()
-	wg := sync.WaitGroup{}
-	priceProcessor, webAlerter, interruptChan := setupApplication(cfg)
-
-	// Канал для сигнализации менеджеру соединений Binance о полном завершении приложения
-	appShutdownSignalForBinanceMgr := make(chan struct{})
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		runBinanceConnectionManager(cfg, priceProcessor, appShutdownSignalForBinanceMgr)		
-	}()
-
-	httpSrv := startHTTPServer(webAlerter)
-
-	log.Println("Приложение запущено. Для выхода нажмите Ctrl+C.")
-
-	// --- Начало Graceful Shutdown ---
-	<-interruptChan
-	log.Println("Получен сигнал прерывания, начинаем graceful shutdown...")
-
-	// 1. Сигнализируем менеджеру соединений Binance о необходимости завершения
-	log.Println("Отправка сигнала завершения менеджеру соединения с Binance...")
-	close(appShutdownSignalForBinanceMgr)
-
-	// 2. Останавливаем HTTP сервер
-	ctxHttp, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelHttp()
-	if err := httpSrv.Shutdown(ctxHttp); err != nil {
-		log.Printf("Ошибка graceful shutdown HTTP сервера: %v", err)
-	} else {
-		log.Println("HTTP сервер остановлен.")
-	}
-
-	log.Println("Ожидание завершения работы менеджера Binance")
-	wg.Wait()
-
-	log.Println("Приложение завершено.")
 }

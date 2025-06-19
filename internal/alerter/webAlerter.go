@@ -2,6 +2,7 @@ package alerter
 
 import (
 	"binance/internal/models"
+	"binance/internal/metrics"
 	"log"
 	"net/http"
 	"sync"
@@ -15,6 +16,8 @@ type WebAlerter struct {
 	mu        sync.Mutex               // Мьютекс для защиты clients
 	upgrader  websocket.Upgrader       // Для "апгрейда" HTTP до WebSocket
 	broadcast chan models.AlertMessage // Канал для рассылки алертов
+	shutdown  chan struct{}
+	wg        sync.WaitGroup
 }
 
 func NewWebAlerter() *WebAlerter {
@@ -27,7 +30,9 @@ func NewWebAlerter() *WebAlerter {
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 		broadcast: make(chan models.AlertMessage, 256), // Буферизированный канал
+		shutdown:  make(chan struct{}),
 	}
+	wa.wg.Add(1)
 	go wa.runBroadcaster() // Запускаем горутину, которая будет рассылать сообщения клиентам
 	return wa
 }
@@ -44,6 +49,26 @@ func (wa *WebAlerter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wa.clients[conn] = true
 	log.Printf("[WebAlerter] Новый веб-клиент подключен. Всего клиентов: %d", len(wa.clients))
 	wa.mu.Unlock()
+	metrics.ConnectedClients.Inc() // metrics increment
+
+	go wa.handleClientReads(conn)
+}
+
+func (wa *WebAlerter) handleClientReads(conn *websocket.Conn) {
+	defer func() {
+		wa.mu.Lock()
+		delete(wa.clients, conn)
+		log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
+		wa.mu.Unlock()
+		conn.Close()
+		metrics.ConnectedClients.Dec() // metrics decrement
+	}()
+
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			break
+		}
+	}
 }
 
 func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPrice float64, oldestPrice float64) {
@@ -62,28 +87,44 @@ func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPric
 }
 
 func (wa *WebAlerter) runBroadcaster() {
-	for alertMsg := range wa.broadcast {
-		// Шаг 1: Получаем "снимок" текущих клиентов под коротким замком
-		wa.mu.Lock()
-		// Создаем слайс, чтобы скопировать указатели на соединения
-		currentClients := make([]*websocket.Conn, 0, len(wa.clients))
-		for client := range wa.clients {
-			currentClients = append(currentClients, client)
-		}
-		wa.mu.Unlock() // <-- Немедленно освобождаем замок!
-
-		// Шаг 2: Итерируемся по "снимку", не блокируя подключение новых клиентов
-		for _, client := range currentClients {
-			// Для каждой отправки можно установить свой таймаут, чтобы не ждать вечно
-			// client.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			err := client.WriteJSON(alertMsg)
-			if err != nil {
-				log.Printf("[WebAlerter] Ошибка записи JSON веб-клиенту: %v. Удаление клиента.", err)
-				client.Close()
-				wa.mu.Lock()
-				delete(wa.clients, client)
-				wa.mu.Unlock()
+	defer wa.wg.Done() // <-- Сигнализируем о завершении, когда выйдем из функции
+	
+	for {
+		select {
+		case alertMsg, ok := <-wa.broadcast:
+			if !ok {
+				return
 			}
+			wa.mu.Lock()
+			currentClients := make([]*websocket.Conn, 0, len(wa.clients))
+			for client := range wa.clients {
+				currentClients = append(currentClients, client)
+				metrics.AlertsSentTotal.Inc() // metrics increment
+			}
+			wa.mu.Unlock()
+
+			for _, client := range currentClients {
+				err := client.WriteJSON(alertMsg)
+				if err != nil {
+					log.Printf("[WebAlerter] Ошибка записи JSON: %v. Удаление клиента.", err)
+					client.Close()
+					wa.mu.Lock()
+					delete(wa.clients, client)
+					wa.mu.Unlock()
+				}
+			}
+		
+		case <-wa.shutdown:
+			log.Println("[WebAlerter] Broadcaster получил сигнал shutdown.")
+			return
 		}
 	}
+}
+
+func (wa *WebAlerter) Shutdown() {
+	log.Println("[WebAlerter] Запуск процедуры остановки...")
+	close(wa.shutdown)
+	// Ждем, пока горутина runBroadcaster действительно завершится
+	wa.wg.Wait()
+	log.Println("[WebAlerter] Остановлен.")
 }

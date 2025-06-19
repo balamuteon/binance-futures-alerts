@@ -4,6 +4,7 @@ import (
 	"binance/internal/alerter"
 	"binance/internal/analysis"
 	"binance/internal/config"
+	"binance/internal/metrics"
 	"binance/internal/models"
 	websocketclient "binance/internal/webSocketClient"
 	"context"
@@ -15,6 +16,8 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -34,15 +37,15 @@ func main() {
 
 	log.Println("Приложение запущено. Для выхода нажмите Ctrl+C.")
 
-	// --- Начало Graceful Shutdown ---
 	<-interruptChan
 	log.Println("Получен сигнал прерывания, начинаем graceful shutdown...")
 
-	// 1. Сигнализируем менеджеру соединений Binance о необходимости завершения
 	log.Println("Отправка сигнала завершения менеджеру соединения с Binance...")
 	close(appShutdownSignalForBinanceMgr)
 
-	// 2. Останавливаем HTTP сервер
+	log.Println("Остановка WebAlerter...")
+	webAlerter.Shutdown()
+
 	ctxHttp, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelHttp()
 	if err := httpSrv.Shutdown(ctxHttp); err != nil {
@@ -55,7 +58,6 @@ func main() {
 	wg.Wait()
 
 	log.Println("Приложение завершено.")
-	time.Sleep(1 * time.Second)
 }
 
 func setupApplication(cfg *config.AppConfig) (*sync.WaitGroup, *analysis.PriceProcessor, *alerter.WebAlerter, chan os.Signal) {
@@ -76,8 +78,20 @@ func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	fs := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", fs)
 	mux.Handle("/ws/alerts", webAlerter)
+	// adding prometheus metrics
+	mux.Handle("/metrics", promhttp.Handler()) 
 
-	srv := newServer(mux)
+	instrumentedMux := metrics.PrometheusMiddleware(mux)
+
+	// This code can be used for pprof analysis
+
+	// mux.HandleFunc("/debug/pprof/", pprof.Index)
+	// mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	// mux.HandleFunc("/debug/pprof/profile", pprof.Profile) // для CPU профиля
+	// mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	// mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	srv := newServer(instrumentedMux)
 
 	log.Println("Запуск HTTP сервера на http://localhost:8080 ...")
 	go func() {
@@ -88,10 +102,10 @@ func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	return srv
 }
 
-func newServer(mux *http.ServeMux) *http.Server {
+func newServer(handler http.Handler) *http.Server {
 	httpServer := &http.Server{
 		Addr:           ":8080",
-		Handler:        mux,
+		Handler:        handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
@@ -116,10 +130,8 @@ func connectAndSubscribeBinance(cfg *config.AppConfig) (*websocketclient.Client,
 
 func processBinanceMessages(
 	client *websocketclient.Client,
-	subReq *models.WebSocketRequest, // Для проверки ID ответа на подписку
+	subReq *models.WebSocketRequest,
 	priceProcessor *analysis.PriceProcessor,
-	// Канал sessionDone сигнализирует этой функции, что нужно завершить текущую сессию
-	// (например, при общем завершении приложения или перед попыткой переподключения)
 	sessionDone chan struct{},
 ) error {
 	log.Println("Горутина обработки сообщений Binance для текущей сессии запущена.")

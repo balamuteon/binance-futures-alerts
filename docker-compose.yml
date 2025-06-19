@@ -1,0 +1,53 @@
+
+services:
+  # 1. Ваше приложение
+  app:
+    container_name: binance_app
+    # Указываем, что образ нужно собрать из текущей папки
+    build: .
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # 2. Prometheus
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.37.0
+    ports:
+      - "9090:9090"
+    # Подключаем наш файл конфигурации внутрь контейнера
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    # Указываем, чтобы prometheus запускался с этой конфигурацией
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  # 3. Grafana
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:9.1.0
+    ports:
+      - "3000:3000"
+
+  # 4. Node Exporter
+  node_exporter:
+    image: prom/node-exporter:v1.3.1
+    container_name: node_exporter
+    restart: no
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+
+  # influxdb:
+  #   image: influxdb:1.8
+  #   container_name: influxdb
+  #   ports:
+  #     - "8086:8086"
+  #   environment:
+  #     - INFLUXDB_DB=k6

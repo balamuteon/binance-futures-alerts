@@ -1,21 +1,23 @@
+// internal/alerter/webAlerter.go
 package alerter
 
 import (
-	"binance/internal/models"
 	"binance/internal/metrics"
+	"binance/internal/models"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/gorilla/websocket" // <--- ИСПРАВЛЕННЫЙ ИМПОРТ
 )
 
 type WebAlerter struct {
-	clients   map[*websocket.Conn]bool // Пул активных веб-клиентов
-	mu        sync.Mutex               // Мьютекс для защиты clients
-	upgrader  websocket.Upgrader       // Для "апгрейда" HTTP до WebSocket
-	broadcast chan models.AlertMessage // Канал для рассылки алертов
+	clients  map[*websocket.Conn]bool
+	mu       sync.RWMutex
+	upgrader websocket.Upgrader
+
+	broadcast chan models.AlertMessage
 	shutdown  chan struct{}
 	wg        sync.WaitGroup
 }
@@ -26,32 +28,40 @@ func NewWebAlerter() *WebAlerter {
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			// Для простоты разрешаем все источники. В продакшене нужно настроить!
-			CheckOrigin: func(r *http.Request) bool { return true },
+			CheckOrigin:     func(r *http.Request) bool { return true },
 		},
-		broadcast: make(chan models.AlertMessage, 256), // Буферизированный канал
+		broadcast: make(chan models.AlertMessage, 256),
 		shutdown:  make(chan struct{}),
 	}
 	wa.wg.Add(1)
-	go wa.runBroadcaster() // Запускаем горутину, которая будет рассылать сообщения клиентам
+	go wa.runBroadcaster()
 	return wa
 }
 
-// ServeHTTP делает WebAlerter обработчиком HTTP запросов для WebSocket
 func (wa *WebAlerter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	log.Println("[WebAlerter] >> ПОЛУЧЕН ЗАПРОС НА ПОДКЛЮЧЕНИЕ")
+
 	conn, err := wa.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("[WebAlerter] Ошибка апгрейда до WebSocket: %v", err)
 		return
 	}
-	// Регистрация нового клиента
+
+	log.Println("[WebAlerter] >> Рукопожатие (upgrade) успешно завершено. Соединение создано.")
+
 	wa.mu.Lock()
 	wa.clients[conn] = true
 	log.Printf("[WebAlerter] Новый веб-клиент подключен. Всего клиентов: %d", len(wa.clients))
 	wa.mu.Unlock()
-	metrics.ConnectedClients.Inc() // metrics increment
+	metrics.ConnectedClients.Inc()
+
+	log.Println("[WebAlerter] >> Клиент сохранен в sync.Map, запуск горутины handleClientReads...")
 
 	go wa.handleClientReads(conn)
+
+	log.Println("[WebAlerter] >> Обработчик ServeHTTP завершает работу для этого запроса.")
+
 }
 
 func (wa *WebAlerter) handleClientReads(conn *websocket.Conn) {
@@ -61,7 +71,7 @@ func (wa *WebAlerter) handleClientReads(conn *websocket.Conn) {
 		log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
 		wa.mu.Unlock()
 		conn.Close()
-		metrics.ConnectedClients.Dec() // metrics decrement
+		metrics.ConnectedClients.Dec()
 	}()
 
 	for {
@@ -87,33 +97,33 @@ func (wa *WebAlerter) Alert(symbol string, percentageChange float64, currentPric
 }
 
 func (wa *WebAlerter) runBroadcaster() {
-	defer wa.wg.Done() // <-- Сигнализируем о завершении, когда выйдем из функции
-	
+	defer wa.wg.Done()
+
 	for {
 		select {
 		case alertMsg, ok := <-wa.broadcast:
 			if !ok {
 				return
 			}
-			wa.mu.Lock()
+			wa.mu.RLock()
 			currentClients := make([]*websocket.Conn, 0, len(wa.clients))
 			for client := range wa.clients {
 				currentClients = append(currentClients, client)
-				metrics.AlertsSentTotal.Inc() // metrics increment
+				metrics.AlertsSentTotal.Inc()
 			}
-			wa.mu.Unlock()
+			wa.mu.RUnlock()
 
 			for _, client := range currentClients {
 				err := client.WriteJSON(alertMsg)
 				if err != nil {
 					log.Printf("[WebAlerter] Ошибка записи JSON: %v. Удаление клиента.", err)
-					client.Close()
 					wa.mu.Lock()
 					delete(wa.clients, client)
 					wa.mu.Unlock()
+					client.Close()
 				}
 			}
-		
+
 		case <-wa.shutdown:
 			log.Println("[WebAlerter] Broadcaster получил сигнал shutdown.")
 			return
@@ -124,7 +134,6 @@ func (wa *WebAlerter) runBroadcaster() {
 func (wa *WebAlerter) Shutdown() {
 	log.Println("[WebAlerter] Запуск процедуры остановки...")
 	close(wa.shutdown)
-	// Ждем, пока горутина runBroadcaster действительно завершится
 	wa.wg.Wait()
 	log.Println("[WebAlerter] Остановлен.")
 }

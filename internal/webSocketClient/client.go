@@ -1,9 +1,10 @@
 package websocketclient
 
 import (
+	"binance/internal/models"
+	"context"
 	"log"
 	"net/url"
-	"binance/internal/models" 
 
 	"github.com/gorilla/websocket"
 )
@@ -45,7 +46,7 @@ func (c *Client) Subscribe(streamName string, requestID int) (*models.WebSocketR
 	return &payload, nil
 }
 
-func (c *Client) ReadMessages(done chan struct{}) (<-chan []byte, <-chan error) {
+func (c *Client) ReadMessages(ctx context.Context) (<-chan []byte, <-chan error) {
 	messages := make(chan []byte)
 	errs := make(chan error, 1) 
 
@@ -55,7 +56,7 @@ func (c *Client) ReadMessages(done chan struct{}) (<-chan []byte, <-chan error) 
 
 		for {
 			select {
-			case <-done:
+			case <-ctx.Done():
 				log.Println("WebSocket клиент: получен сигнал 'done', завершение чтения.")
 				return
 			default: // Продолжаем читать сообщения

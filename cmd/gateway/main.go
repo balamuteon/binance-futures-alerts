@@ -10,10 +10,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"net/http/pprof"
 
 	"binance/internal/alerter"
 	"binance/internal/kafka" // <-- Используем наш общий пакет
-	"binance/internal/metrics"
+	// "binance/internal/metrics"
 	"binance/internal/models"
 	kafkaGo "github.com/segmentio/kafka-go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -64,8 +65,9 @@ func main() {
 		for {
 			msg, err := kafkaReader.ReadMessage(context.Background())
 			if err != nil {
-				log.Printf("[Gateway] Ошибка чтения из Kafka: %v", err)
-				break
+				log.Printf("[Gateway] Ошибка чтения из Kafka: %v. Повторная попытка через 5 секунд.", err)
+				time.Sleep(5 * time.Second)
+				continue
 			}
 			log.Printf("[Gateway] Получено сообщение из Kafka: %s", string(msg.Value))
 
@@ -113,10 +115,16 @@ func startHTTPServer(webAlerter *alerter.WebAlerter) *http.Server {
 	mux.Handle("/ws/alerts", webAlerter)
 	mux.Handle("/metrics", promhttp.Handler())
 
-	instrumentedMux := metrics.PrometheusMiddleware(mux)
-	srv := newServer(instrumentedMux)
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	log.Printf("[Gateway] Запуск HTTP сервера на порту : %s", os.Getenv("PORT"))
+	// instrumentedMux := metrics.PrometheusMiddleware(mux)
+	srv := newServer(mux)
+
+	log.Printf("[Gateway] Запуск HTTP сервера на порту : %s", srv.Addr)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("[Gateway] Критическая ошибка HTTP сервера: %v", err)

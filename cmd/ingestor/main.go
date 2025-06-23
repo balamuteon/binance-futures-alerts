@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync" // <-- Импортируем sync
+	"syscall"
 	"time"
 
 	"binance/internal/config"
@@ -20,8 +22,11 @@ func main() {
 	cfg := config.Load()
 	kafkaBroker := os.Getenv("KAFKA_BROKER")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	// Таймаут на проверку топика
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+
+	// Ожидание готовности Kafka
 	for {
 		err := kafka.EnsureTopicExists(ctx, kafkaBroker, topic)
 		if err == nil {
@@ -35,7 +40,6 @@ func main() {
 		}
 	}
 
-	// --- Настройка Kafka Producer ---
 	kafkaWriter := &kafkaGO.Writer{
 		Addr:     kafkaGO.TCP(kafkaBroker),
 		Topic:    topic,
@@ -44,26 +48,39 @@ func main() {
 	defer kafkaWriter.Close()
 	log.Println("[Ingestor] Kafka writer настроен.")
 
-	// --- Основная логика ---
+	// --- Улучшенный Graceful Shutdown ---
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+
+	// Запускаем менеджер подключений
+	wg.Add(1)
+	go runBinanceConnectionManager(shutdownCtx, &wg, cfg, kafkaWriter)
+
+	// Ожидаем сигнала прерывания (Ctrl+C)
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-
-	appShutdownSignal := make(chan struct{})
-
-	// Запускаем менеджер подключений, который теперь будет писать в Kafka
-	go runBinanceConnectionManager(cfg, kafkaWriter, appShutdownSignal)
-
-	// Ждем сигнала Ctrl+C
+	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-interrupt
-	log.Println("[Ingestor] Получен сигнал прерывания, начинаем graceful shutdown...")
-	close(appShutdownSignal)
 
-	log.Println("[Ingestor] Приложение завершено.")
+	log.Println("[Ingestor] Получен сигнал прерывания, начинаем graceful shutdown...")
+	shutdownCancel() // Сигнализируем горутине о необходимости завершения
+	wg.Wait()          // Ждем, пока горутина действительно завершится
+
+	log.Println("[Ingestor] Приложение корректно завершено.")
 }
 
-// Эта функция теперь принимает kafkaGO.Writer вместо PriceProcessor
-func runBinanceConnectionManager(cfg *config.AppConfig, kafkaWriter *kafkaGO.Writer, appShutdownSignal chan struct{}) {
+func runBinanceConnectionManager(ctx context.Context, wg *sync.WaitGroup, cfg *config.AppConfig, kafkaWriter *kafkaGO.Writer) {
+	defer wg.Done()
+
+	// Цикл для переподключений
 	for {
+		// Проверяем, не пора ли завершать работу, перед новой попыткой.
+		select {
+		case <-ctx.Done():
+			log.Println("[Ingestor] Контекст отменен, менеджер подключений завершает работу.")
+			return
+		default:
+		}
+
 		client, err := websocketclient.New(cfg.FuturesWebSocketURL)
 		if err != nil {
 			log.Printf("[Ingestor] Ошибка подключения к Binance: %v", err)
@@ -72,7 +89,7 @@ func runBinanceConnectionManager(cfg *config.AppConfig, kafkaWriter *kafkaGO.Wri
 		}
 
 		client.Subscribe(cfg.StreamName, 1)
-		messagesChan, errsChan := client.ReadMessages(appShutdownSignal)
+		messagesChan, errsChan := client.ReadMessages(ctx) // Передаем контекст в ридер
 		log.Println("[Ingestor] Начинаем читать сообщения от Binance...")
 
 	readerLoop:
@@ -83,13 +100,12 @@ func runBinanceConnectionManager(cfg *config.AppConfig, kafkaWriter *kafkaGO.Wri
 					log.Println("[Ingestor] Канал сообщений закрыт.")
 					break readerLoop
 				}
-				err := kafkaWriter.WriteMessages(context.Background(),
-					kafkaGO.Message{
-						Value: msg,
-					},
-				)
+				// Передаем контекст в WriteMessages, чтобы он тоже мог быть прерван
+				err := kafkaWriter.WriteMessages(ctx, kafkaGO.Message{Value: msg})
 				if err != nil {
-					log.Printf("[Ingestor] Ошибка записи в Kafka: %v", err)
+					// Если запись в Kafka не удалась, разрываем цикл, чтобы переподключиться.
+					log.Printf("[Ingestor] Ошибка записи в Kafka: %v. Разрываем сессию для переподключения.", err)
+					break readerLoop
 				}
 
 			case err, ok := <-errsChan:
@@ -100,7 +116,7 @@ func runBinanceConnectionManager(cfg *config.AppConfig, kafkaWriter *kafkaGO.Wri
 				log.Printf("[Ingestor] Ошибка от WebSocket клиента: %v", err)
 				break readerLoop
 
-			case <-appShutdownSignal:
+			case <-ctx.Done():
 				log.Println("[Ingestor] Получен сигнал shutdown.")
 				break readerLoop
 			}
@@ -109,8 +125,10 @@ func runBinanceConnectionManager(cfg *config.AppConfig, kafkaWriter *kafkaGO.Wri
 		client.Close()
 		log.Println("[Ingestor] Сессия завершена, переподключение через 5 секунд...")
 
+		// Пауза перед переподключением, с возможностью немедленного выхода при shutdown.
 		select {
-		case <-appShutdownSignal:
+		case <-ctx.Done():
+			// Выходим из основного цикла for, если shutdown пришел во время паузы
 			return
 		case <-time.After(5 * time.Second):
 		}

@@ -1,53 +1,76 @@
-
 services:
-  # 1. Ваше приложение
-  app:
-    container_name: binance_app
-    # Указываем, что образ нужно собрать из текущей папки
-    build: .
+  # --- НОВАЯ, УПРОЩЕННАЯ КОНФИГУРАЦИЯ KAFKA ---
+  kafka:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka
     ports:
-      - "8080:8080"
-    restart: unless-stopped
-
-  # 2. Prometheus
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:v2.37.0
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-
-  # 3. Grafana
-  grafana:
-    container_name: grafana
-    image: grafana/grafana:9.1.0
-    ports:
-      - "3000:3000"
-
-  # 4. Node Exporter
-  node_exporter:
-    image: prom/node-exporter:v1.3.1
-    container_name: node_exporter
-    restart: no
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-
- # 5. InfluxDB для хранения результатов k6
-  influxdb:
-    container_name: influxdb
-    image: influxdb:1.8
-    ports:
-      - "8086:8086"
+      - '9092:9092' # Порт для клиентов с вашего компьютера (localhost)
     environment:
-      - INFLUXDB_DB=k6
+      # Включаем KRaft режим (без Zookeeper)
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9093,CONTROLLER://:9094,EXTERNAL://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9093,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9094
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Включаем автоматическое создание топиков
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    volumes:
+      - 'kafka_data:/bitnami/kafka'
+
+  # --- ingestor microservice ---
+  ingestor:
+    container_name: ingestor
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: ingestor
+    environment:
+      - KAFKA_BROKER=kafka:9093
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    command: ["./ingestor"]
+
+  # --- generator microservice ---
+  generator:
+    container_name: generator
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: generator # <-- Указываем имя нового сервиса
+    environment:
+      - KAFKA_BROKER=kafka:9093
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    command: ["./generator"] # <-- Явно указываем команду запуска
+    
+  # --- gateway microservice ---
+  gateway:
+    container_name: gateway
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway
+    environment:
+      - KAFKA_BROKER=kafka:9093
+      - PORT=:8080
+    ports:
+      # Пробрасываем порт 8080 из контейнера наружу на порт 8080 хоста
+      - "8080:8080"
     restart: always
+    depends_on:
+      - kafka
+    # Явно указываем команду для запуска этого сервиса
+    command: ["./gateway"]
+
+# --- Добавляем секцию volumes в конец файла ---
+volumes:
+  kafka_data:
+    driver: local

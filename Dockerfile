@@ -1,25 +1,20 @@
-FROM golang:1.24-alpine AS builder
+# Dockerfile
 
+# Этап 1: Сборка
+FROM golang:1.24.4 AS builder
 WORKDIR /app
-
+ARG SERVICE_NAME
 COPY go.mod go.sum ./
-
-RUN go mod download && go mod verify
-
+RUN go mod download
 COPY . .
+# Собираем только тот сервис, который указан в SERVICE_NAME
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/${SERVICE_NAME} ./cmd/${SERVICE_NAME}
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /app/server ./cmd/
-
+# Этап 2: Финальный образ
 FROM alpine:latest
-
 RUN apk --no-cache add ca-certificates
-
 WORKDIR /app
-
-COPY --from=builder /app/static ./static/
-
-COPY --from=builder /app/server .
-
-EXPOSE 8080
-
-CMD ["./server"]
+ARG SERVICE_NAME
+# Копируем только скомпилированный бинарник из этапа сборки
+COPY --from=builder /app/bin/${SERVICE_NAME} .
+COPY ./static ./static

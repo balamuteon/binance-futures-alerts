@@ -42,12 +42,12 @@ func (c *Client) Subscribe(streamName string, requestID int) (*models.WebSocketR
 		log.Printf("Ошибка отправки JSON для подписки: %v", err)
 		return nil, err
 	}
-	return &payload, nil // Возвращаем payload, чтобы ID был доступен для проверки ответа
+	return &payload, nil
 }
 
 func (c *Client) ReadMessages(done chan struct{}) (<-chan []byte, <-chan error) {
 	messages := make(chan []byte)
-	errs := make(chan error, 1) // Буферизированный канал для ошибок
+	errs := make(chan error, 1) 
 
 	go func() {
 		defer close(messages)
@@ -55,7 +55,7 @@ func (c *Client) ReadMessages(done chan struct{}) (<-chan []byte, <-chan error) 
 
 		for {
 			select {
-			case <-done: // Если пришел сигнал о завершении
+			case <-done:
 				log.Println("WebSocket клиент: получен сигнал 'done', завершение чтения.")
 				return
 			default: // Продолжаем читать сообщения
@@ -63,7 +63,7 @@ func (c *Client) ReadMessages(done chan struct{}) (<-chan []byte, <-chan error) 
 				if err != nil {
 					log.Printf("WebSocket клиент: ошибка чтения сообщения: %v", err)
 					errs <- err
-					return // Завершаем горутину при ошибке чтения
+					return
 				}
 
 				if messageType == websocket.TextMessage {
@@ -92,9 +92,7 @@ func (c *Client) Close() error {
 	err := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	if err != nil {
 		log.Printf("WebSocket клиент: ошибка отправки CloseMessage: %v", err)
-		// Все равно пытаемся закрыть соединение локально
 		return c.conn.Close()
 	}
-	// Также закрываем локальное соединение
 	return c.conn.Close()
 }

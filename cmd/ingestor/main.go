@@ -20,7 +20,6 @@ const topic = "raw_tickers"
 
 func main() {
 	cfg := config.Load()
-	kafkaBroker := os.Getenv("KAFKA_BROKER")
 
 	// Таймаут на проверку топика
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -28,7 +27,7 @@ func main() {
 
 	// Ожидание готовности Kafka
 	for {
-		err := kafka.EnsureTopicExists(ctx, kafkaBroker, topic)
+		err := kafka.EnsureTopicExists(ctx, topic)
 		if err == nil {
 			break
 		}
@@ -41,7 +40,7 @@ func main() {
 	}
 
 	kafkaWriter := &kafkaGO.Writer{
-		Addr:     kafkaGO.TCP(kafkaBroker),
+		Addr:     kafkaGO.TCP(kafka.KafkaBroker),
 		Topic:    topic,
 		Balancer: &kafkaGO.LeastBytes{},
 	}

@@ -38,6 +38,6 @@ func (ka *KafkaAlerter) Alert(symbol string, percentageChange float64, currentPr
 	if err != nil {
 		log.Printf("[Generator] Ошибка записи алерта в Kafka: %v", err)
 	} else {
-		log.Printf("[Generator] >>> Алерт для %s отправлен в Kafka!", symbol)
+		// log.Printf("[Generator] >>> Алерт для %s отправлен в Kafka!", symbol)
 	}
 }

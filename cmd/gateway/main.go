@@ -13,7 +13,7 @@ import (
 	"net/http/pprof"
 
 	"binance/internal/alerter"
-	"binance/internal/kafka" // <-- Используем наш общий пакет
+	"binance/internal/kafka"
 	// "binance/internal/metrics"
 	"binance/internal/models"
 	kafkaGo "github.com/segmentio/kafka-go"
@@ -27,8 +27,6 @@ const (
 )
 
 func main() {
-	kafkaBroker := os.Getenv("KAFKA_BROKER")
-
 	webAlerter := alerter.NewWebAlerter()
 	logAlerter := alerter.NewLogAlerter()
 	compositeAlerter := alerter.NewCompositeAlerter(webAlerter, logAlerter)
@@ -38,7 +36,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	for {
-		err := kafka.EnsureTopicExists(ctx, kafkaBroker, consumerTopic)
+		err := kafka.EnsureTopicExists(ctx, consumerTopic)
 		if err == nil {
 			log.Printf("[Gateway] Топик '%s' готов для работы.", consumerTopic)
 			break
@@ -52,7 +50,7 @@ func main() {
 	}
 
 	kafkaReader := kafkaGo.NewReader(kafkaGo.ReaderConfig{
-		Brokers: []string{kafkaBroker},
+		Brokers: []string{kafka.KafkaBroker},
 		GroupID: consumerGroup,
 		Topic:   consumerTopic,
 		

@@ -1,0 +1,44 @@
+# .github/workflows/ci.yml
+
+name: Build and Push Docker Images
+
+# Этот воркфлоу будет запускаться при каждом пуше в ветку 'main'
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Даем права на запись в GitHub Packages (Container Registry)
+
+    strategy:
+      matrix:
+        # Определяем матрицу для сборки всех трех сервисов
+        service: [ingestor, generator, gateway]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          # Передаем SERVICE_NAME как build-arg в Dockerfile
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+          # Указываем, что нужно опубликовать (push) образ
+          push: true
+          # Формируем тег для образа. Например: ghcr.io/your-username/ingestor:latest
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest

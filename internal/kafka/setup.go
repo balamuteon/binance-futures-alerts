@@ -4,22 +4,23 @@ import (
 	"context"
 	"log"
 	"net"
+	"os"
 	"strconv"
 
 	"github.com/segmentio/kafka-go"
 )
 
 var (
-	kafkaBroker = "kafka:9093"
+	KafkaBroker = os.Getenv("KAFKA_BROKER")
 )
 
 // EnsureTopicExists проверяет и создает топик, если его нет.
 // Теперь это переиспользуемая функция.
-func EnsureTopicExists(ctx context.Context, brokerAddress, topicName string) error {
-	log.Printf("Проверка и создание топика '%s' на брокере %s...", topicName, brokerAddress)
+func EnsureTopicExists(ctx context.Context, topicName string) error {
+	log.Printf("Проверка и создание топика '%s' на брокере %s...", topicName, KafkaBroker)
 
 	// Используем Dial, а не DialLeader, так как нам нужен любой брокер для получения метаданных
-	conn, err := kafka.Dial("tcp", brokerAddress)
+	conn, err := kafka.Dial("tcp", KafkaBroker)
 	if err != nil {
 		return err
 	}

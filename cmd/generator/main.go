@@ -26,14 +26,13 @@ const (
 
 func main() {
 	cfg := config.Load()
-	kafkaBroker := os.Getenv("KAFKA_BROKER")
 
-	if err := kafka.EnsureTopicExists(context.Background(), kafkaBroker, producerTopic); err != nil {
+	if err := kafka.EnsureTopicExists(context.Background(), producerTopic); err != nil {
 		log.Fatalf("[Generator] Не удалось создать/проверить топик %s: %v", producerTopic, err)
 	}
 
 	kafkaWriter := &kafkaGO.Writer{
-		Addr:     kafkaGO.TCP(kafkaBroker),
+		Addr:     kafkaGO.TCP(kafka.KafkaBroker),
 		Topic:    producerTopic,
 		Balancer: &kafkaGO.LeastBytes{},
 	}
@@ -66,7 +65,7 @@ func main() {
 			}
 
 			kafkaReader := kafkaGO.NewReader(kafkaGO.ReaderConfig{
-				Brokers:  []string{kafkaBroker},
+				Brokers:  []string{kafka.KafkaBroker},
 				GroupID:  consumerGroup,
 				Topic:    consumerTopic,
 				MinBytes: 10e3,

@@ -1,4 +1,3 @@
-// internal/alerter/webAlerter.go
 package alerter
 
 import (
@@ -9,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket" // <--- ИСПРАВЛЕННЫЙ ИМПОРТ
+	"github.com/gorilla/websocket"
 )
 
 type WebAlerter struct {
@@ -39,36 +38,25 @@ func NewWebAlerter() *WebAlerter {
 }
 
 func (wa *WebAlerter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	log.Println("[WebAlerter] >> ПОЛУЧЕН ЗАПРОС НА ПОДКЛЮЧЕНИЕ")
-
 	conn, err := wa.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("[WebAlerter] Ошибка апгрейда до WebSocket: %v", err)
 		return
 	}
 
-	log.Println("[WebAlerter] >> Рукопожатие (upgrade) успешно завершено. Соединение создано.")
-
 	wa.mu.Lock()
 	wa.clients[conn] = true
-	log.Printf("[WebAlerter] Новый веб-клиент подключен. Всего клиентов: %d", len(wa.clients))
 	wa.mu.Unlock()
 	metrics.ConnectedClients.Inc()
 
-	log.Println("[WebAlerter] >> Клиент сохранен в sync.Map, запуск горутины handleClientReads...")
-
 	go wa.handleClientReads(conn)
-
-	log.Println("[WebAlerter] >> Обработчик ServeHTTP завершает работу для этого запроса.")
-
 }
 
 func (wa *WebAlerter) handleClientReads(conn *websocket.Conn) {
 	defer func() {
 		wa.mu.Lock()
 		delete(wa.clients, conn)
-		log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
+		// log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
 		wa.mu.Unlock()
 		conn.Close()
 		metrics.ConnectedClients.Dec()

@@ -23,7 +23,7 @@ func (la *LogAlerter) Alert(symbol string, percentageChange float64, currentPric
 		"!!! ALERT !!! Символ: %s, Цена %s %.2f%%. Текущая: %.4f, Старая в окне: %.4f",
 		symbol,
 		directionText,
-		math.Abs(percentageChange), // Используем math.Abs для отображения абсолютного значения процента
+		math.Abs(percentageChange),
 		currentPrice,
 		oldestPrice,
 	)

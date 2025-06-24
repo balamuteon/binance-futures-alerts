@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"os"
@@ -62,7 +63,7 @@ func main() {
 
 	log.Println("[Ingestor] Получен сигнал прерывания, начинаем graceful shutdown...")
 	shutdownCancel() // Сигнализируем горутине о необходимости завершения
-	wg.Wait()          // Ждем, пока горутина действительно завершится
+	wg.Wait()        // Ждем, пока горутина действительно завершится
 
 	log.Println("[Ingestor] Приложение корректно завершено.")
 }
@@ -98,6 +99,11 @@ func runBinanceConnectionManager(ctx context.Context, wg *sync.WaitGroup, cfg *c
 				if !ok {
 					log.Println("[Ingestor] Канал сообщений закрыт.")
 					break readerLoop
+				}
+
+				if bytes.HasPrefix(msg, []byte(`{"result":}`)) {
+					log.Println("[Ingestor] Получено и проигнорировано сообщение-подтверждение от Binance.")
+					continue
 				}
 				// Передаем контекст в WriteMessages, чтобы он тоже мог быть прерван
 				err := kafkaWriter.WriteMessages(ctx, kafkaGO.Message{Value: msg})

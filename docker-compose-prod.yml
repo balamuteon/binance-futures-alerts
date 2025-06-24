@@ -28,13 +28,13 @@ services:
     #   dockerfile: Dockerfile
     #   args:
     #     SERVICE_NAME: ingestor
-    image: ghcr.io/balamuteon/binance-futures-alerts/ingestor:1e00dc0
+    image: ghcr.io/balamuteon/binance-futures-alerts/ingestor:7b9f5e0
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
     depends_on:
       - kafka
-  # command: ["./ingestor"]
+    command: ["./ingestor"]
 
   # --- generator microservice ---
   generator:
@@ -44,13 +44,13 @@ services:
     #   dockerfile: Dockerfile
     #   args:
     #     SERVICE_NAME: generator # <-- Указываем имя нового сервиса
-    image: ghcr.io/balamuteon/binance-futures-alerts/generator:1e00dc0
+    image: ghcr.io/balamuteon/binance-futures-alerts/generator:7b9f5e0
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
     depends_on:
       - kafka
-    # command: ["./generator"]
+    command: ["./generator"]
     
   # --- gateway microservice ---
   gateway:
@@ -60,7 +60,7 @@ services:
     #   dockerfile: Dockerfile
     #   args:
     #     SERVICE_NAME: gateway
-    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:1e00dc0
+    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:7b9f5e0
     environment:
       - KAFKA_BROKER=kafka:9093
       - PORT=:8080
@@ -70,7 +70,7 @@ services:
     restart: always
     depends_on:
       - kafka
-# command: ["./gateway"]
+    command: ["./gateway"]
 
 # --- Добавляем секцию volumes в конец файла ---
 volumes:

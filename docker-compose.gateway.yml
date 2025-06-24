@@ -1,0 +1,17 @@
+# docker-compose.gateway.yml
+# Файл для запуска отдельного экземпляра gateway на новой машине
+
+services:
+  gateway:
+    container_name: gateway-2 # Дадим ему другое имя
+    # Используем тот же образ, что собрал наш пайплайн
+    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:develop # Укажите ваш тег
+    restart: always
+    ports:
+      # Пробрасываем порт 8080 для подключения пользователей к этому экземпляру
+      - "8080:8080"
+    environment:
+      # ВАЖНО: Указываем IP-адрес Машины А и внешний порт Kafka (9092)
+      - KAFKA_BROKER=192.168.0.193:9092 # <--- ЗАМЕНИТЕ IP НА АДРЕС ВАШЕЙ МАШИНЫ А
+      - PORT=:8080
+    command: ["./gateway"]

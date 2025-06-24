@@ -1,44 +1,67 @@
 # .github/workflows/ci.yml
 
-name: Build and Push Docker Images
+name: CI/CD Build and Push
 
-# Этот воркфлоу будет запускаться при каждом пуше в ветку 'main'
+# --- УЛУЧШЕННЫЙ БЛОК ТРИГГЕРОВ ---
 on:
+  # Запускать при пуше в ветки main и develop
   push:
-    branches: [ "main" ]
+    branches:
+      - "main"
+      - "develop"
+  # А также запускать при создании Pull Request в эти ветки
+  pull_request:
+    branches:
+      - "main"
+      - "develop"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # Даем права на запись в GitHub Packages (Container Registry)
+      packages: write
 
     strategy:
       matrix:
-        # Определяем матрицу для сборки всех трех сервисов
+        # Матрица для сборки всех трех сервисов остается без изменений
         service: [ingestor, generator, gateway]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to the GitHub Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # --- ШАГ ДЛЯ ГЕНЕРАЦИИ МЕТАДАННЫХ (ТЕГОВ) ---
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          # Создаем теги на основе события:
+          # - для ветки main будет тег 'latest'
+          # - для ветки develop будет тег 'develop'
+          # - для всех событий будет тег с коротким хешем коммита
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=,format=short
+
+      # --- ШАГ СБОРКИ И ПУБЛИКАЦИИ С НОВЫМИ ТЕГАМИ ---
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          # Передаем SERVICE_NAME как build-arg в Dockerfile
           build-args: |
             SERVICE_NAME=${{ matrix.service }}
-          # Указываем, что нужно опубликовать (push) образ
           push: true
-          # Формируем тег для образа. Например: ghcr.io/your-username/ingestor:latest
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest
+          # Используем теги, сгенерированные на предыдущем шаге
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

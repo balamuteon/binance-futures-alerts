@@ -56,7 +56,7 @@ func (wa *WebAlerter) handleClientReads(conn *websocket.Conn) {
 	defer func() {
 		wa.mu.Lock()
 		delete(wa.clients, conn)
-		// log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
+		log.Printf("[WebAlerter] Веб-клиент отключился. Всего клиентов: %d", len(wa.clients))
 		wa.mu.Unlock()
 		conn.Close()
 		metrics.ConnectedClients.Dec()

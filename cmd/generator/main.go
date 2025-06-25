@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log"
@@ -8,16 +9,16 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time" // <-- Импортируем time
+	"time"
 
 	"binance/internal/analysis"
 	"binance/internal/config"
 	"binance/internal/kafka"
 	"binance/internal/models"
 
-	kafkaGO "github.com/segmentio/kafka-go"
 )
 
+var kafkaBroker = os.Getenv("KAFKA_BROKER")
 const (
 	consumerTopic = "raw_tickers"
 	producerTopic = "system_alerts"
@@ -27,15 +28,11 @@ const (
 func main() {
 	cfg := config.Load()
 
-	if err := kafka.EnsureTopicExists(context.Background(), producerTopic); err != nil {
+	if err := kafka.EnsureTopicExists(context.Background(), kafkaBroker, producerTopic); err != nil {
 		log.Fatalf("[Generator] Не удалось создать/проверить топик %s: %v", producerTopic, err)
 	}
 
-	kafkaWriter := &kafkaGO.Writer{
-		Addr:     kafkaGO.TCP(kafka.KafkaBroker),
-		Topic:    producerTopic,
-		Balancer: &kafkaGO.LeastBytes{},
-	}
+	kafkaWriter := kafka.NewWriter(producerTopic, kafkaBroker)
 	defer kafkaWriter.Close()
 	log.Println("[Generator] Kafka writer настроен.")
 
@@ -64,13 +61,12 @@ func main() {
 			default:
 			}
 
-			kafkaReader := kafkaGO.NewReader(kafkaGO.ReaderConfig{
-				Brokers:  []string{kafka.KafkaBroker},
-				GroupID:  consumerGroup,
-				Topic:    consumerTopic,
-				MinBytes: 10e3,
-				MaxBytes: 10e6,
-			})
+			kafkaReader := kafka.NewReader([]string{kafkaBroker},
+				consumerGroup,
+				consumerTopic,
+				kafka.WithMinBytes(10e3),
+				kafka.WithMaxBytes(10e6),
+			)
 			log.Println("[Generator] Kafka reader успешно создан, начинаем чтение сообщений.")
 
 			for {
@@ -86,6 +82,10 @@ func main() {
 
 				var tickers []models.MiniTicker
 				if err := json.Unmarshal(msg.Value, &tickers); err != nil {
+					if bytes.HasPrefix(msg.Value, []byte(`{"result":`)) {
+						log.Println("[Ingestor] Получено и проигнорировано сообщение-подтверждение от Binance.")
+						continue
+					}
 					log.Printf("[Generator] Не удалось распарсить сообщение: %s", string(msg.Value))
 					continue
 				}
@@ -95,7 +95,6 @@ func main() {
 				}
 			}
 
-			// Закрываем "сломанный" или более не нужный Reader.
 			kafkaReader.Close()
 
 			select {

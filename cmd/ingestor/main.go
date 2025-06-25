@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"log"
 	"os"
@@ -17,6 +16,7 @@ import (
 	kafkaGO "github.com/segmentio/kafka-go"
 )
 
+var kafkaBroker = os.Getenv("KAFKA_BROKER")
 const topic = "raw_tickers"
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 
 	// Ожидание готовности Kafka
 	for {
-		err := kafka.EnsureTopicExists(ctx, topic)
+		err := kafka.EnsureTopicExists(ctx, kafkaBroker, topic)
 		if err == nil {
 			break
 		}
@@ -40,15 +40,10 @@ func main() {
 		}
 	}
 
-	kafkaWriter := &kafkaGO.Writer{
-		Addr:     kafkaGO.TCP(kafka.KafkaBroker),
-		Topic:    topic,
-		Balancer: &kafkaGO.LeastBytes{},
-	}
+	kafkaWriter := kafka.NewWriter(topic, kafkaBroker)
 	defer kafkaWriter.Close()
 	log.Println("[Ingestor] Kafka writer настроен.")
 
-	// --- Улучшенный Graceful Shutdown ---
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
@@ -101,10 +96,6 @@ func runBinanceConnectionManager(ctx context.Context, wg *sync.WaitGroup, cfg *c
 					break readerLoop
 				}
 
-				if bytes.HasPrefix(msg, []byte(`{"result":}`)) {
-					log.Println("[Ingestor] Получено и проигнорировано сообщение-подтверждение от Binance.")
-					continue
-				}
 				// Передаем контекст в WriteMessages, чтобы он тоже мог быть прерван
 				err := kafkaWriter.WriteMessages(ctx, kafkaGO.Message{Value: msg})
 				if err != nil {

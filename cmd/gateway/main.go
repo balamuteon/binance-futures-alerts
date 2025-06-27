@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -19,12 +20,12 @@ import (
 	// "binance/internal/metrics"
 	"binance/internal/models"
 
+	"github.com/google/uuid"
 )
 
 var kafkaBroker = os.Getenv("KAFKA_BROKER")
 const (
 	consumerTopic = "system_alerts"
-	consumerGroup = "gateway-group"
 )
 
 func main() {
@@ -39,7 +40,10 @@ func main() {
 	webAlerter := alerter.NewWebAlerter()
 	httpSrv := startHTTPServer(webAlerter, errs)
 
-	go runKafkaConsumer(webAlerter, errs)
+	uniqueConsumerGroup := fmt.Sprintf("gateway-group-%s", uuid.New().String())
+	log.Printf("[Gateway] Используется уникальная группа подписчика: %s", uniqueConsumerGroup)
+
+	go runKafkaConsumer(webAlerter, errs, uniqueConsumerGroup)
 
 	// Блокируемся на сигнал
 	log.Printf("[Gateway] Приложение запущено. Выход по сигналу: %v", <-errs)
@@ -57,7 +61,7 @@ func main() {
 	log.Println("[Gateway] Приложение завершено.")
 }
 
-func runKafkaConsumer(webAlerter *alerter.WebAlerter, errs chan error) {
+func runKafkaConsumer(webAlerter *alerter.WebAlerter, errs chan error, consumerGroup string) {
 	log.Println("[Gateway] Запуск горутины-моста Kafka->WebAlerter")
 	
 	// Ожидаем доступности Kafka

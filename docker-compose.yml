@@ -1,5 +1,4 @@
 services:
-  # --- НОВАЯ, УПРОЩЕННАЯ КОНФИГУРАЦИЯ KAFKA ---
   kafka:
     image: 'bitnami/kafka:latest'
     container_name: kafka
@@ -42,13 +41,13 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        SERVICE_NAME: generator # <-- Указываем имя нового сервиса
+        SERVICE_NAME: generator
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
     depends_on:
       - kafka
-    command: ["./generator"] # <-- Явно указываем команду запуска
+    command: ["./generator"]
     
   # --- gateway microservice ---
   gateway:
@@ -62,15 +61,12 @@ services:
       - KAFKA_BROKER=kafka:9093
       - PORT=:8080
     ports:
-      # Пробрасываем порт 8080 из контейнера наружу на порт 8080 хоста
       - "8080:8080"
     restart: always
     depends_on:
       - kafka
-    # Явно указываем команду для запуска этого сервиса
     command: ["./gateway"]
 
-# --- Добавляем секцию volumes в конец файла ---
 volumes:
   kafka_data:
     driver: local

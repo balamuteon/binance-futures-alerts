@@ -3,13 +3,12 @@
 services:
   gateway:
     container_name: gateway-2
-    # Используем тот же образ, что собрал наш пайплайн
-    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:develop # Укажите ваш тег
+    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:develop
     restart: always
     ports:
       - "8080:8080"
     environment:
       # Указываем IP-адрес Машины А и внешний порт Kafka (9092)
-      - KAFKA_BROKER=192.168.0.193:9092 # <--- ЗАМЕНИТЕ IP НА АДРЕС ВАШЕЙ МАШИНЫ А
+      - KAFKA_BROKER=192.168.0.193:9092
       - PORT=:8080
     command: ["./gateway"]

@@ -13,6 +13,7 @@ import (
 	"binance/internal/pkg/config"
 	"binance/internal/pkg/kafka"
 	websocketclient "binance/internal/pkg/webSocketClient"
+
 	kafkaGO "github.com/segmentio/kafka-go"
 )
 
@@ -91,8 +92,12 @@ func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 		client, err := websocketclient.New(a.cfg.FuturesWebSocketURL)
 		if err != nil {
 			log.Printf("[Ingestor] Ошибка подключения к Binance: %v. Повторная попытка через 5с.", err)
-			time.Sleep(5 * time.Second)
-			continue // Переходим к следующей итерации цикла
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+			continue
 		}
 
 		client.Subscribe(a.cfg.StreamName, 1)
@@ -155,7 +160,7 @@ func ensureKafkaTopic(ctx context.Context, kafkaBroker, topic string) error {
 			return nil
 		}
 		log.Printf("[Ingestor] Не удалось настроить топик Kafka: %v. Повторная попытка через 5 секунд.", err)
-		
+
 		select {
 		case <-time.After(5 * time.Second):
 		case <-ctx.Done():

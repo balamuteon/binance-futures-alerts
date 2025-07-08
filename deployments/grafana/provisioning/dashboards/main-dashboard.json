@@ -1,0 +1,179 @@
+{
+	"__inputs": [],
+	"__requires": [],
+	"annotations": {
+		"list": []
+	},
+	"editable": true,
+	"gnetId": null,
+	"graphTooltip": 0,
+	"id": null,
+	"links": [],
+	"panels": [
+		{
+			"datasource": "Prometheus",
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 8,
+				"x": 0,
+				"y": 0
+			},
+			"id": 4,
+			"options": {
+				"orientation": "auto",
+				"reduceOptions": {
+					"calcs": [
+						"lastNotNull"
+					],
+					"fields": "",
+					"values": false
+				},
+				"showThresholdLabels": false,
+				"showThresholdMarkers": true
+			},
+			"pluginVersion": "8.2.1",
+			"targets": [
+				{
+					"exemplar": true,
+					"expr": "app_websocket_connected_clients",
+					"interval": "",
+					"legendFormat": "Клиенты",
+					"refId": "A"
+				}
+			],
+			"title": "Подключенные клиенты (WebSocket)",
+			"type": "gauge"
+		},
+		{
+			"datasource": "Prometheus",
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 8,
+				"x": 8,
+				"y": 0
+			},
+			"id": 2,
+			"options": {
+				"colorMode": "value",
+				"graphMode": "area",
+				"justifyMode": "auto",
+				"orientation": "auto",
+				"reduceOptions": {
+					"calcs": [
+						"lastNotNull"
+					],
+					"fields": "",
+					"values": false
+				},
+				"textMode": "auto"
+			},
+			"pluginVersion": "8.2.1",
+			"targets": [
+				{
+					"exemplar": true,
+					"expr": "app_alerts_sent_total",
+					"interval": "",
+					"legendFormat": "Отправлено алертов",
+					"refId": "A"
+				}
+			],
+			"title": "Всего отправлено алертов",
+			"type": "stat"
+		},
+		{
+			"datasource": "Prometheus",
+			"fieldConfig": {
+				"defaults": {
+					"custom": {},
+					"mappings": []
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 9,
+				"w": 24,
+				"x": 0,
+				"y": 8
+			},
+			"id": 6,
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "single"
+				}
+			},
+			"targets": [
+				{
+					"exemplar": true,
+					"expr": "rate(app_http_request_duration_seconds_sum[5m]) / rate(app_http_request_duration_seconds_count[5m])",
+					"interval": "",
+					"legendFormat": "{{path}}",
+					"refId": "A"
+				}
+			],
+			"title": "Среднее время ответа HTTP (p95)",
+			"type": "timeseries"
+		}
+	],
+	"schemaVersion": 30,
+	"style": "dark",
+	"tags": [],
+	"templating": {
+		"list": []
+	},
+	"time": {
+		"from": "now-6h",
+		"to": "now"
+	},
+	"timepicker": {},
+	"timezone": "",
+	"title": "Binance Alerter Overview",
+	"version": 0
+}

@@ -15,7 +15,9 @@ import (
 	"binance/internal/gateway/alerter"
 	"binance/internal/gateway/handlers"
 	"binance/internal/pkg/kafka"
+	"binance/internal/pkg/metrics"
 	"binance/internal/pkg/models"
+
 	"github.com/google/uuid"
 )
 
@@ -30,10 +32,12 @@ type App struct {
 func New(kafkaBroker string) (*App, error) {
 	webAlerter := alerter.NewWebAlerter()
 	handler := handlers.NewHandler(webAlerter)
+
+	instrumentedHandler := metrics.PrometheusMiddleware(handler)
 	
 	httpServer := &http.Server{
 		Addr:         os.Getenv("PORT"),
-		Handler:      handler,
+		Handler:      instrumentedHandler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}

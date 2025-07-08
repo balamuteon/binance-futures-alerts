@@ -148,23 +148,3 @@ func (a *App) processMessages(ctx context.Context, reader *kafka.KafkaReader) {
 		}
 	}
 }
-
-// Добавим метод Close в PriceProcessor для корректного закрытия KafkaAlerter.
-// internal/generator/analysis/processor.go
-/*
-func (pp *PriceProcessor) Close() error {
-    // Если у Alerter есть метод Close, вызываем его.
-    // Это потребует создания интерфейса с методом Close.
-    if closer, ok := pp.alerter.(interface{ Close() error }); ok {
-        return closer.Close()
-    }
-    return nil
-}
-
-// И в KafkaAlerter:
-// internal/pkg/kafka/alerter.go
-func (ka *KafkaAlerter) Close() error {
-    log.Println("[KafkaAlerter] Закрытие Kafka writer.")
-    return ka.Writer.Close()
-}
-*/

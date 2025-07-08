@@ -46,6 +46,7 @@ func (wa *WebAlerter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	wa.mu.Lock()
 	wa.clients[conn] = true
+	log.Printf("[WebAlerter] Новый веб-клиент подключился. Всего клиентов: %d", len(wa.clients))
 	wa.mu.Unlock()
 	metrics.ConnectedClients.Inc()
 

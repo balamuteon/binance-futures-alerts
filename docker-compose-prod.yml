@@ -20,7 +20,7 @@ services:
   # --- ingestor microservice ---
   ingestor:
     container_name: ingestor
-    image: ghcr.io/balamuteon/binance-futures-alerts/ingestor:develop
+    image: ghcr.io/balamuteon/binance-futures-alerts/ingestor:ce0dfc2
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
@@ -31,7 +31,7 @@ services:
   # --- generator microservice ---
   generator:
     container_name: generator
-    image: ghcr.io/balamuteon/binance-futures-alerts/generator:develop
+    image: ghcr.io/balamuteon/binance-futures-alerts/generator:ce0dfc2
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
@@ -42,7 +42,7 @@ services:
   # --- gateway microservice ---
   gateway:
     container_name: gateway
-    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:develop
+    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:ce0dfc2
     environment:
       - KAFKA_BROKER=kafka:9093
       - PORT=:8080

@@ -1,6 +1,6 @@
 package alerter
 
-import "binance/internal/analysis"
+import "binance/internal/generator/analysis"
 
 type CompositeAlerter struct {
 	alerters []analysis.Alerter

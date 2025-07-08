@@ -12,6 +12,10 @@ import (
 
 type ReaderOption func(*kafkaGO.ReaderConfig)
 
+type KafkaReader struct {
+	Reader *kafkaGO.Reader
+}
+
 func NewWriter(topic, kafkaBroker string) *kafkaGO.Writer {
 	return &kafkaGO.Writer{
 		Addr:     kafkaGO.TCP(kafkaBroker),
@@ -20,7 +24,7 @@ func NewWriter(topic, kafkaBroker string) *kafkaGO.Writer {
 	}
 }
 
-func NewReader(kafkaBroker []string, groupId, topic string, opts ...ReaderOption) *kafkaGO.Reader {
+func NewReader(kafkaBroker []string, groupId, topic string, opts ...ReaderOption) KafkaReader {
 	config := kafkaGO.ReaderConfig{
 		Brokers:        kafkaBroker,
 		GroupID:        groupId,
@@ -35,7 +39,7 @@ func NewReader(kafkaBroker []string, groupId, topic string, opts ...ReaderOption
 		opt(&config)
 	}
 
-	return kafkaGO.NewReader(config)
+	return KafkaReader{Reader: kafkaGO.NewReader(config)} 
 }
 
 func WithMinBytes(minBytes int) ReaderOption {

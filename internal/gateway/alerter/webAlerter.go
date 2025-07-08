@@ -1,8 +1,8 @@
 package alerter
 
 import (
-	"binance/internal/metrics"
-	"binance/internal/models"
+	"binance/internal/pkg/metrics"
+	"binance/internal/pkg/models"
 	"log"
 	"net/http"
 	"sync"

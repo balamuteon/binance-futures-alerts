@@ -1,10 +1,10 @@
 package analysis
 
 import (
+	"binance/internal/pkg/config"
+	"binance/internal/pkg/models"
 	"container/list"
 	"log"
-	"binance/internal/config"
-	"binance/internal/models"
 	"math"
 	"strconv"
 	"sync"
@@ -79,7 +79,7 @@ func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 				percentageChange := ((currentPriceFloat - oldestPointInWindow.Price) / oldestPointInWindow.Price) * 100.0
 
 				alertConditionMet := false
-				
+
 				if percentageChange > pp.config.PercentageThreshold {
 					alertConditionMet = true
 				} else if percentageChange < -pp.config.PercentageThreshold {
@@ -95,4 +95,13 @@ func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 			}
 		}
 	}
+}
+
+func (pp *PriceProcessor) Close() error {
+	// Если у Alerter есть метод Close, вызываем его.
+	// Это потребует создания интерфейса с методом Close.
+	if closer, ok := pp.alerter.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
 }

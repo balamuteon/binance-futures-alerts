@@ -1,7 +1,7 @@
 package kafka
 
 import (
-	"binance/internal/models"
+	"binance/internal/pkg/models"
 	"context"
 	"encoding/json"
 	"log"
@@ -40,4 +40,9 @@ func (ka *KafkaAlerter) Alert(symbol string, percentageChange float64, currentPr
 	} else {
 		log.Printf("[Generator] >>> Алерт для %s отправлен в Kafka!", symbol)
 	}
+}
+
+func (ka *KafkaAlerter) Close() error {
+	log.Println("[KafkaAlerter] Закрытие Kafka writer.")
+	return ka.Writer.Close()
 }

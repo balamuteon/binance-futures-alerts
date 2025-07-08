@@ -1,7 +1,7 @@
 package websocketclient
 
 import (
-	"binance/internal/models"
+	"binance/internal/pkg/models"
 	"context"
 	"log"
 	"net/url"

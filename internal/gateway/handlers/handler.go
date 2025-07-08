@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"binance/internal/alerter"
+	"binance/internal/gateway/alerter"
 	"net/http"
 	"net/http/pprof"
 

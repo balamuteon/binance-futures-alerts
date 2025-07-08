@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"binance/internal/config"
-	"binance/internal/kafka"
-	websocketclient "binance/internal/webSocketClient"
+	"binance/internal/pkg/config"
+	"binance/internal/pkg/kafka"
+	websocketclient "binance/internal/pkg/webSocketClient"
 
 	kafkaGO "github.com/segmentio/kafka-go"
 )

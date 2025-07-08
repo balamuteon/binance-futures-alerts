@@ -3,9 +3,8 @@ services:
     image: 'bitnami/kafka:latest'
     container_name: kafka
     ports:
-      - '9092:9092' # Порт для клиентов с вашего компьютера (localhost)
+      - '9092:9092'
     environment:
-      # Включаем KRaft режим (без Zookeeper)
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
@@ -14,7 +13,6 @@ services:
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9094
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Включаем автоматическое создание топиков
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     volumes:
       - 'kafka_data:/bitnami/kafka'
@@ -22,11 +20,7 @@ services:
   # --- ingestor microservice ---
   ingestor:
     container_name: ingestor
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: ingestor
+    image: ghcr.io/balamuteon/binance-futures-alerts/ingestor:develop
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
@@ -37,11 +31,7 @@ services:
   # --- generator microservice ---
   generator:
     container_name: generator
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: generator
+    image: ghcr.io/balamuteon/binance-futures-alerts/generator:develop
     environment:
       - KAFKA_BROKER=kafka:9093
     restart: unless-stopped
@@ -52,11 +42,7 @@ services:
   # --- gateway microservice ---
   gateway:
     container_name: gateway
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: gateway
+    image: ghcr.io/balamuteon/binance-futures-alerts/gateway:develop
     environment:
       - KAFKA_BROKER=kafka:9093
       - PORT=:8080

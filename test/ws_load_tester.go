@@ -22,8 +22,8 @@ var (
 
 func main() {
 	addr := flag.String("addr", "localhost:8080", "websocket service address")
-	path := flag.String("path", "/ws", "websocket path")
-	numClients := flag.Int("c", 100, "number of concurrent clients")
+	path := flag.String("path", "/ws/alerts", "websocket path")
+	numClients := flag.Int("c", 10000, "number of concurrent clients")
 	testDuration := flag.Duration("d", 30*time.Second, "duration of the test")
 	flag.Parse()
 

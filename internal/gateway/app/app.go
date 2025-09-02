@@ -23,8 +23,8 @@ import (
 
 // App инкапсулирует все компоненты и зависимости сервиса gateway.
 type App struct {
-	httpServer *http.Server
-	webAlerter *alerter.WebAlerter
+	httpServer  *http.Server
+	webAlerter  *alerter.WebAlerter
 	kafkaBroker string
 }
 
@@ -34,7 +34,6 @@ func New(kafkaBroker string) (*App, error) {
 	handler := handlers.NewHandler(webAlerter)
 
 	instrumentedHandler := metrics.PrometheusMiddleware(handler)
-	
 	httpServer := &http.Server{
 		Addr:         os.Getenv("PORT"),
 		Handler:      instrumentedHandler,
@@ -43,8 +42,8 @@ func New(kafkaBroker string) (*App, error) {
 	}
 
 	return &App{
-		httpServer: httpServer,
-		webAlerter: webAlerter,
+		httpServer:  httpServer,
+		webAlerter:  webAlerter,
 		kafkaBroker: kafkaBroker,
 	}, nil
 }
@@ -81,7 +80,7 @@ func (a *App) Run() error {
 
 func (a *App) shutdown() error {
 	log.Println("[Gateway] Начало процедуры остановки...")
-	
+
 	a.webAlerter.Shutdown()
 	log.Println("[Gateway] WebAlerter остановлен.")
 
@@ -147,7 +146,7 @@ func (a *App) ensureKafkaTopic(topic string) error {
 			log.Printf("[Gateway] Топик '%s' готов для работы.", topic)
 			return nil
 		}
-		
+
 		log.Printf("[Gateway] Ожидание Kafka и топика '%s': %v. Повторная попытка через 5 секунд.", topic, err)
 		select {
 		case <-time.After(5 * time.Second):

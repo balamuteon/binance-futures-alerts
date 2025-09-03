@@ -1,11 +1,12 @@
+version: '3.8'
+
 services:
   kafka:
     image: 'bitnami/kafka:latest'
     container_name: kafka
     ports:
-      - '9092:9092' # Порт для клиентов с вашего компьютера (localhost)
+      - '9092:9092'
     environment:
-      # Включаем KRaft режим (без Zookeeper)
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
@@ -14,12 +15,10 @@ services:
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9094
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Включаем автоматическое создание топиков
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     volumes:
       - 'kafka_data:/bitnami/kafka'
 
-  # --- ingestor microservice ---
   ingestor:
     container_name: ingestor
     build:
@@ -34,7 +33,6 @@ services:
       - kafka
     command: ["./ingestor"]
 
-  # --- generator microservice ---
   generator:
     container_name: generator
     build:
@@ -49,7 +47,6 @@ services:
       - kafka
     command: ["./generator"]
     
-  # --- gateway microservice ---
   gateway:
     container_name: gateway
     build:
@@ -67,6 +64,22 @@ services:
       - kafka
     command: ["./gateway"]
 
+  # --- ДОБАВЛЕН СЕРВИС NODE EXPORTER ---
+  node_exporter:
+    image: prom/node-exporter:v1.3.1
+    container_name: node_exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    # Порт 9100 не нужно пробрасывать наружу, Prometheus сам найдет его по внутренней сети Docker
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -78,6 +91,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
     depends_on:
       - gateway
+      - node_exporter # <-- Добавлена зависимость
 
   grafana:
     image: grafana/grafana-oss:latest

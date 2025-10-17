@@ -32,7 +32,8 @@ type App struct {
 }
 
 // New создает новый экземпляр приложения generator.
-func New(kafkaBroker string) (*App, error) {
+func New() (*App, error) {
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
 	if kafkaBroker == "" {
 		return nil, fmt.Errorf("адрес Kafka-брокера не может быть пустым")
 	}

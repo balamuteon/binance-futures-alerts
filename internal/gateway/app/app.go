@@ -29,7 +29,12 @@ type App struct {
 }
 
 // New создает и конфигурирует новый экземпляр приложения.
-func New(kafkaBroker string) (*App, error) {
+func New() (*App, error) {
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		log.Fatal("[Gateway] Переменная окружения KAFKA_BROKER не установлена")
+	}
+	
 	webAlerter := alerter.NewWebAlerter()
 	handler := handlers.NewHandler(webAlerter)
 

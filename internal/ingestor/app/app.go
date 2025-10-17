@@ -27,7 +27,8 @@ type App struct {
 }
 
 // New создает и конфигурирует новый экземпляр приложения ingestor.
-func New(kafkaBroker string) (*App, error) {
+func New() (*App, error) {
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
 	if kafkaBroker == "" {
 		return nil, fmt.Errorf("адрес Kafka-брокера не может быть пустым")
 	}

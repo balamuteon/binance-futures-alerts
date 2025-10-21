@@ -65,7 +65,8 @@
         }
 
         .app-shell {
-            width: min(960px, 100%);
+            width: min(960px, 94%);
+            margin: 0 auto;
             backdrop-filter: var(--blur);
             background: linear-gradient(145deg, var(--bg-secondary), rgba(15, 23, 42, 0.55));
             border-radius: 28px;
@@ -77,6 +78,7 @@
             position: relative;
             z-index: 1;
             border: 1px solid rgba(148, 163, 184, 0.08);
+            transition: width 0.38s ease;
         }
 
         .header {
@@ -144,7 +146,8 @@
 
         .content {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            align-items: stretch;
             gap: 28px;
         }
 
@@ -363,6 +366,156 @@
             transform: translateY(-4px);
         }
 
+        .alerts-area {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            flex: 1 1 auto;
+            min-width: 0;
+            transform: translateX(0);
+            transition: flex-basis 0.35s ease, max-width 0.35s ease, transform 0.35s ease;
+        }
+
+        .chart-panel {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            flex: 0 0 0;
+            min-width: 0;
+            max-width: 0;
+            opacity: 0;
+            transform: translateX(48px);
+            overflow: hidden;
+            pointer-events: none;
+            transition: flex-basis 0.38s ease, opacity 0.32s ease, transform 0.38s ease;
+        }
+
+        .chart-panel__container {
+            height: 100%;
+            border-radius: 24px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.6));
+            box-shadow: 0 30px 80px rgba(8, 47, 73, 0.55);
+            padding: 22px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: clamp(450px, 62vh, 680px);
+        }
+
+        .chart-panel__header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .chart-panel__meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .chart-panel__symbol {
+            font-size: clamp(22px, 3vw, 30px);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        .chart-panel__subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .chart-panel__controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+
+        .chart-panel__open {
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.18);
+            border: 1px solid rgba(56, 189, 248, 0.42);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .chart-panel__open:hover {
+            background: rgba(56, 189, 248, 0.32);
+            border-color: rgba(56, 189, 248, 0.62);
+            transform: translateY(-1px);
+        }
+
+        .chart-panel__close {
+            width: 38px;
+            height: 38px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            background: rgba(15, 23, 42, 0.72);
+            color: var(--text-secondary);
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .chart-panel__close:hover {
+            color: var(--text-primary);
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .chart-panel__frame {
+            flex: 1 1 auto;
+            min-height: clamp(380px, 55vh, 600px);
+            border-radius: 20px;
+            overflow: hidden;
+            background: rgba(15, 23, 42, 0.82);
+        }
+
+        .chart-panel__frame iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .app-shell--chart-open {
+            width: min(1380px, 96%);
+        }
+
+        .app-shell--chart-open .content {
+            gap: 24px;
+        }
+
+        .app-shell--chart-open .alerts-area {
+            flex: 0 0 34%;
+            max-width: 34%;
+            transform: translateX(-12px);
+        }
+
+        .app-shell--chart-open .chart-panel {
+            flex: 1 1 auto;
+            max-width: 100%;
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .alert-symbol--active {
+            color: var(--text-primary);
+            text-shadow: 0 0 16px rgba(56, 189, 248, 0.55);
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 24px 16px 100px;
@@ -371,6 +524,47 @@
             .app-shell {
                 padding: 28px 24px;
                 border-radius: 24px;
+            }
+
+            .content {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .alerts-area {
+                gap: 20px;
+            }
+
+            .app-shell--chart-open {
+                width: min(960px, 100%);
+            }
+
+            .app-shell--chart-open .content {
+                flex-direction: column;
+            }
+
+            .app-shell--chart-open .alerts-area,
+            .app-shell--chart-open .chart-panel {
+                flex: 1 1 auto;
+                max-width: 100%;
+            }
+
+            .chart-panel__controls {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .chart-panel__close {
+                order: 2;
+            }
+
+            .chart-panel__container {
+                min-height: clamp(360px, 66vh, 560px);
+            }
+
+            .chart-panel__frame {
+                min-height: clamp(320px, 60vh, 520px);
             }
 
             .alert {
@@ -395,12 +589,30 @@
         </header>
 
         <main class="content">
-            <ul id="alertsList"></ul>
+            <section class="alerts-area">
+                <ul id="alertsList"></ul>
 
-            <div class="actions">
-                <button type="button" onclick="playSoundTest()">Послушать тестовый сигнал</button>
-                <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio>
-            </div>
+                <div class="actions">
+                    <button type="button" onclick="playSoundTest()">Послушать тестовый сигнал</button>
+                    <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio>
+                </div>
+            </section>
+
+            <aside id="chartPanel" class="chart-panel" aria-hidden="true">
+                <div class="chart-panel__container">
+                    <div class="chart-panel__header">
+                        <div class="chart-panel__meta">
+                            <span id="chartPanelSymbol" class="chart-panel__symbol">—</span>
+                            <span class="chart-panel__subtitle">TradingView • 15m</span>
+                        </div>
+                        <div class="chart-panel__controls">
+                            <a id="chartPanelOpen" class="chart-panel__open" href="#" target="_blank" rel="noopener" tabindex="-1">Открыть в TradingView</a>
+                            <button type="button" id="chartPanelClose" class="chart-panel__close" aria-label="Закрыть график" tabindex="-1">×</button>
+                        </div>
+                    </div>
+                    <div class="chart-panel__frame"></div>
+                </div>
+            </aside>
         </main>
     </div>
 
@@ -440,10 +652,154 @@
 
             const alertsList = document.getElementById("alertsList");
             const statusDiv = document.getElementById("status");
+            const appShell = document.querySelector(".app-shell");
+            const chartPanel = document.getElementById("chartPanel");
+            const chartPanelFrame = chartPanel ? chartPanel.querySelector(".chart-panel__frame") : null;
+            const chartPanelSymbol = document.getElementById("chartPanelSymbol");
+            const chartPanelOpenLink = document.getElementById("chartPanelOpen");
+            const chartPanelCloseButton = document.getElementById("chartPanelClose");
+            let chartActiveLink = null;
+            let chartActiveSymbol = null;
             let socket;
 
             const alertSound = new Audio('alert.wav');
             alertSound.preload = 'auto';
+
+            function ensureChartIframe(symbol) {
+                if (!chartPanelFrame) { return; }
+
+                let iframe = chartPanelFrame.querySelector("iframe");
+                const embedUrl = `https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(symbol)}&interval=15&symboledit=1&saveimage=0&toolbarbg=f1f3f6&studies=[]&hideideas=1&theme=dark&style=1&timezone=Etc/UTC&hidevolume=1&withdateranges=0&allow_symbol_change=1&locale=ru`;
+
+                if (!iframe) {
+                    iframe = document.createElement("iframe");
+                    iframe.setAttribute("allowtransparency", "true");
+                    iframe.setAttribute("scrolling", "no");
+                    iframe.loading = "lazy";
+                    iframe.title = "TradingView preview";
+                    iframe.referrerPolicy = "no-referrer-when-downgrade";
+                    chartPanelFrame.appendChild(iframe);
+                }
+
+                if (iframe.dataset.loadedSymbol !== symbol) {
+                    iframe.src = embedUrl;
+                    iframe.dataset.loadedSymbol = symbol;
+                }
+            }
+
+            function setActiveSymbolLink(link) {
+                if (!alertsList) { return; }
+                const activeLinks = alertsList.querySelectorAll(".alert-symbol--active");
+                activeLinks.forEach(activeLink => {
+                    if (activeLink !== link) {
+                        activeLink.classList.remove("alert-symbol--active");
+                    }
+                });
+
+                if (link) {
+                    link.classList.add("alert-symbol--active");
+                }
+            }
+
+            function openChartPanel(link) {
+                if (!chartPanel || !chartPanelOpenLink || !appShell) { return; }
+                if (!link || !link.dataset.tvSymbol) { return; }
+
+                const symbol = link.dataset.tvSymbol;
+                ensureChartIframe(symbol);
+
+                if (chartPanelSymbol) {
+                    const baseSymbol = link.dataset.rawSymbol || (link.textContent ? link.textContent.trim() : symbol);
+                    chartPanelSymbol.textContent = baseSymbol || symbol;
+                    chartPanelSymbol.title = symbol;
+                }
+
+                chartPanel.dataset.symbol = symbol;
+                chartPanelOpenLink.href = link.href;
+                chartPanelOpenLink.removeAttribute("tabindex");
+                if (chartPanelCloseButton) {
+                    chartPanelCloseButton.removeAttribute("tabindex");
+                }
+
+                chartActiveSymbol = symbol;
+                chartActiveLink = link;
+                setActiveSymbolLink(link);
+
+                appShell.classList.add("app-shell--chart-open");
+                chartPanel.setAttribute("aria-hidden", "false");
+            }
+
+            function closeChartPanel() {
+                if (!chartPanel || !appShell) { return; }
+                chartPanel.removeAttribute("data-symbol");
+                chartPanel.setAttribute("aria-hidden", "true");
+                appShell.classList.remove("app-shell--chart-open");
+                if (chartPanelSymbol) {
+                    chartPanelSymbol.textContent = "—";
+                    chartPanelSymbol.removeAttribute("title");
+                }
+                if (chartPanelOpenLink) {
+                    chartPanelOpenLink.href = "#";
+                    chartPanelOpenLink.setAttribute("tabindex", "-1");
+                }
+                if (chartPanelCloseButton) {
+                    chartPanelCloseButton.setAttribute("tabindex", "-1");
+                }
+                chartActiveSymbol = null;
+                chartActiveLink = null;
+                setActiveSymbolLink(null);
+            }
+
+            function isModifiedEvent(event) {
+                return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+            }
+
+            function handleSymbolClick(event) {
+                const link = event.currentTarget;
+                if (isModifiedEvent(event)) { return; }
+                event.preventDefault();
+
+                if (chartActiveSymbol === link.dataset.tvSymbol) {
+                    openChartPanel(link);
+                    return;
+                }
+
+                openChartPanel(link);
+            }
+
+            function handleDocumentKeydown(event) {
+                if (event.key === "Escape" && chartPanel && chartPanel.getAttribute("aria-hidden") === "false") {
+                    closeChartPanel();
+                }
+            }
+
+            function syncChartPanelLink() {
+                if (!alertsList || !chartActiveSymbol) {
+                    chartActiveLink = null;
+                    setActiveSymbolLink(null);
+                    return;
+                }
+
+                const links = alertsList.querySelectorAll(".alert-symbol");
+                let matchedLink = null;
+
+                links.forEach(candidate => {
+                    if (!matchedLink && candidate.dataset.tvSymbol === chartActiveSymbol) {
+                        matchedLink = candidate;
+                    }
+                });
+
+                chartActiveLink = matchedLink;
+                setActiveSymbolLink(matchedLink);
+            }
+
+            if (chartPanelCloseButton) {
+                chartPanelCloseButton.addEventListener("click", () => {
+                    closeChartPanel();
+                });
+            }
+
+            document.addEventListener("keydown", handleDocumentKeydown);
 
             function updateStatus(state, text) {
                 statusDiv.textContent = text;
@@ -549,10 +905,22 @@
                     </div>
                 `;
 
+                const symbolLink = listItem.querySelector(".alert-symbol");
+                if (symbolLink) {
+                    symbolLink.dataset.tvSymbol = tradingViewSymbolParam;
+                    symbolLink.dataset.rawSymbol = originalBinanceTicker;
+                    symbolLink.addEventListener("click", handleSymbolClick);
+                }
+
                 alertsList.prepend(listItem);
 
                 while (alertsList.children.length > 50) {
-                    alertsList.removeChild(alertsList.lastChild);
+                    const lastChild = alertsList.lastChild;
+                    alertsList.removeChild(lastChild);
+                }
+
+                if (chartActiveSymbol) {
+                    syncChartPanelLink();
                 }
             }
 

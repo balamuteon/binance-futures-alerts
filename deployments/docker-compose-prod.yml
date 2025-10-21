@@ -1,6 +1,6 @@
 services:
   kafka:
-    image: 'bitnami/kafka:latest'
+    image: 'public.ecr.aws/bitnami/kafka:3.7.0'
     container_name: kafka
     ports:
       - '9092:9092'

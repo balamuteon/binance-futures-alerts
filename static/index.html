@@ -3,43 +3,429 @@
 <head>
     <meta charset="UTF-8">
     <title>Binance Futures Alerts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #282c34; color: #abb2bf; }
-        h1 { color: #61afef; }
-        #status { margin-bottom: 10px; padding: 5px; border-radius: 3px; }
-        .status-connected { background-color: #98c379; color: #282c34; }
-        .status-disconnected { background-color: #e06c75; color: #282c34; }
-        #alertsList { list-style: none; padding: 0; }
-        .alert { background-color: #323842; border-left: 5px solid #e06c75; margin-bottom: 10px; padding: 15px; border-radius: 3px; }
-        .alert-symbol { font-weight: bold; color: #e5c07b; text-decoration: none; } /* Добавил text-decoration: none для ссылки */
-        .alert-symbol:hover { text-decoration: underline; } /* Подчеркивание при наведении */
-        .alert-details { font-size: 0.9em; color: #abb2bf; margin-top: 5px; }
-        .alert-time { font-size: 0.8em; color: #56b6c2; float: right; }
-        #enableSoundButton { margin-top: 10px; padding: 8px; cursor: pointer; }
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: rgba(15, 23, 42, 0.72);
+            --bg-glass: rgba(30, 41, 59, 0.75);
+            --accent: #38bdf8;
+            --accent-strong: #0ea5e9;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --success: #34d399;
+            --danger: #f87171;
+            --neutral: #94a3b8;
+            --card-shadow: 0 24px 60px rgba(15, 23, 42, 0.55);
+            --blur: blur(22px);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.42;
+            z-index: 0;
+        }
+
+        body::before {
+            background: #38bdf8;
+            top: -160px;
+            right: -80px;
+        }
+
+        body::after {
+            background: #f97316;
+            bottom: -200px;
+            left: -140px;
+        }
+
+        .app-shell {
+            width: min(960px, 100%);
+            backdrop-filter: var(--blur);
+            background: linear-gradient(145deg, var(--bg-secondary), rgba(15, 23, 42, 0.55));
+            border-radius: 28px;
+            padding: 36px 40px;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            position: relative;
+            z-index: 1;
+            border: 1px solid rgba(148, 163, 184, 0.08);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(28px, 4vw, 36px);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 16px;
+            max-width: 520px;
+            line-height: 1.6;
+        }
+
+        .status {
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-start;
+            transition: background 0.3s ease, color 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .status::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        .status-connecting {
+            color: #facc15;
+            background: rgba(250, 204, 21, 0.1);
+            border-color: rgba(250, 204, 21, 0.25);
+        }
+
+        .status-connected {
+            color: var(--success);
+            background: rgba(52, 211, 153, 0.1);
+            border-color: rgba(52, 211, 153, 0.25);
+        }
+
+        .status-disconnected {
+            color: var(--danger);
+            background: rgba(248, 113, 113, 0.12);
+            border-color: rgba(248, 113, 113, 0.32);
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        #alertsList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-height: min(540px, 60vh);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+        }
+
+        #alertsList::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #alertsList::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #alertsList::-webkit-scrollbar-thumb {
+            background-color: rgba(148, 163, 184, 0.4);
+            border-radius: 999px;
+        }
+
+        .alert {
+            background: rgba(15, 23, 42, 0.76);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-left: 6px solid var(--accent);
+            border-radius: 18px;
+            padding: 18px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 12px 30px rgba(8, 47, 73, 0.24);
+            position: relative;
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+
+        .alert::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.09), rgba(236, 72, 153, 0.04));
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .alert:hover::after {
+            opacity: 1;
+        }
+
+        .alert > div {
+            position: relative;
+            z-index: 1;
+        }
+
+        .alert-symbol {
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+            letter-spacing: 0.02em;
+        }
+
+        .alert-symbol:hover {
+            color: var(--accent-strong);
+        }
+
+        .alert-details {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .alert-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-left: auto;
+            font-weight: 600;
+        }
+
+        .alert-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        .alert-title::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .price-rise {
+            border-left-color: var(--success);
+        }
+
+        .price-fall {
+            border-left-color: var(--danger);
+        }
+
+        .price-neutral {
+            border-left-color: var(--neutral);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button,
+        #enableSoundButton {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.6));
+            color: var(--text-primary);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-radius: 14px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        button:hover,
+        #enableSoundButton:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(8, 47, 73, 0.35);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(14, 165, 233, 0.8));
+        }
+
+        button:active,
+        #enableSoundButton:active {
+            transform: translateY(0);
+        }
+
+        .floating-info {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        .info-trigger {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.6), rgba(15, 23, 42, 0.6));
+            color: var(--text-primary);
+            display: grid;
+            place-items: center;
+            font-size: 22px;
+            font-weight: 700;
+            cursor: help;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            backdrop-filter: blur(18px);
+        }
+
+        .info-trigger:hover,
+        .floating-info:focus-within .info-trigger {
+            transform: translateY(-4px);
+            box-shadow: 0 18px 36px rgba(8, 47, 73, 0.5);
+        }
+
+        .info-tooltip {
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 18px;
+            padding: 18px 22px;
+            width: min(320px, 80vw);
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+            box-shadow: 0 22px 40px rgba(8, 47, 73, 0.45);
+        }
+
+        .info-tooltip strong {
+            color: var(--text-primary);
+        }
+
+        .floating-info:hover .info-tooltip,
+        .floating-info:focus-within .info-tooltip {
+            pointer-events: auto;
+            opacity: 1;
+            transform: translateY(-4px);
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 24px 16px 100px;
+            }
+
+            .app-shell {
+                padding: 28px 24px;
+                border-radius: 24px;
+            }
+
+            .alert {
+                border-radius: 16px;
+                padding: 16px 18px;
+            }
+
+            .subtitle {
+                font-size: 15px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Уведомления Binance Futures</h1>
-    <div id="status">Подключение...</div>
-    <ul id="alertsList"></ul>
+    <div class="app-shell">
+        <header class="header">
+            <div>
+                <h1>Binance Futures Alerts</h1>
+                <p class="subtitle">удобный онлайн-инструмент для трейдеров, который мгновенно уведомляет о резких изменениях на рынке.</p>
+            </div>
+            <div id="status" class="status status-connecting">Связываемся с потоком сигналов...</div>
+        </header>
 
-    <hr> <button onclick="playSoundTest()">Проверить Звук (Тест)</button>
-    <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio> 
-    
+        <main class="content">
+            <ul id="alertsList"></ul>
+
+            <div class="actions">
+                <button type="button" onclick="playSoundTest()">Послушать тестовый сигнал</button>
+                <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio>
+            </div>
+        </main>
+    </div>
+
+    <div class="floating-info">
+        <button type="button" class="info-trigger" aria-label="Что это за сайт?" tabindex="0">i</button>
+        <div class="info-tooltip">
+            <strong>Info.</strong><br>
+            Следите за фьючерсами Binance в реальном времени: если цена любого контракта изменится более чем на 2% за последнюю минуту, вы сразу получите уведомление и звуковой сигнал. Просто откройте сайт и оставайтесь в курсе быстрых движений рынка - никаких задержек, только live-сигналы.
+        </div>
+    </div>
+
     <script>
         // Функция для тестовой кнопки
         function playSoundTest() {
-            console.log("НАЖАТА КНОПКА 'Проверить Звук'");
+            console.log("НАЖАТА КНОПКА 'Послушать тестовый сигнал'");
             const testPlayer = document.getElementById('testAudioPlayer');
             if (testPlayer) {
                 testPlayer.play()
-                    .then(() => { 
-                        console.log("Тестовый звук (с кнопки) УСПЕШНО воспроизведен!"); 
-                        alert("Звук с кнопки должен был проиграться!"); 
+                    .then(() => {
+                        console.log("Тестовый звук (с кнопки) УСПЕШНО воспроизведен!");
+                        alert("Если все хорошо, вы услышали короткий сигнал.");
                     })
-                    .catch(error => { 
-                        console.error("Ошибка тестового воспроизведения звука (с кнопки):", error); 
-                        alert("Ошибка звука с кнопки: " + error.name + " - " + error.message);
+                    .catch(error => {
+                        console.error("Ошибка тестового воспроизведения звука (с кнопки):", error);
+                        alert("Не удалось воспроизвести звук: " + error.name + " - " + error.message);
                     });
             } else {
                 console.error("Тестовый плеер #testAudioPlayer не найден!");
@@ -56,18 +442,23 @@
             const statusDiv = document.getElementById("status");
             let socket;
 
-            const alertSound = new Audio('alert.wav'); 
+            const alertSound = new Audio('alert.wav');
             alertSound.preload = 'auto';
 
+            function updateStatus(state, text) {
+                statusDiv.textContent = text;
+                statusDiv.className = `status ${state}`;
+            }
+
             function connect() {
+                updateStatus("status-connecting", "Связываемся с потоком сигналов...");
                 const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
                 const wsUrl = `${wsProtocol}//${window.location.host}/ws/alerts`;
-                
+
                 socket = new WebSocket(wsUrl);
 
-                socket.onopen = function(event) {
-                    statusDiv.textContent = "Подключено к серверу алертов.";
-                    statusDiv.className = "status-connected";
+                socket.onopen = function() {
+                    updateStatus("status-connected", "На связи: получаем новые сигналы.");
                 };
 
                 socket.onmessage = function(event) {
@@ -76,21 +467,19 @@
                         displayAlert(alertData);
 
                         alertSound.play()
-                            .then(() => {
-                            })
                             .catch(error => {
                                 console.error("!!!!! ОСНОВНОЙ СКРИПТ: alertSound.play() НЕ УДАЛОСЬ:", error.name, error.message);
-                                
+
                                 if (!document.getElementById('enableSoundButton')) {
                                     const enableSoundButton = document.createElement('button');
                                     enableSoundButton.id = 'enableSoundButton';
-                                    enableSoundButton.textContent = 'Включить звук уведомлений';
+                                    enableSoundButton.textContent = 'Разрешить звук сигналов';
                                     enableSoundButton.onclick = () => {
                                         alertSound.play().then(() => {
                                             enableSoundButton.style.display = 'none';
                                         }).catch(e => console.error("ОСНОВНОЙ СКРИПТ: Ошибка при активации звука пользователем через кнопку:", e));
                                     };
-                                    
+
                                     if (statusDiv && statusDiv.parentNode) {
                                         statusDiv.parentNode.insertBefore(enableSoundButton, statusDiv.nextSibling);
                                     } else {
@@ -105,72 +494,68 @@
 
                 socket.onerror = function(error) {
                     console.error("ОСНОВНОЙ СКРИПТ: WebSocket onerror:", error);
-                    statusDiv.textContent = "Ошибка WebSocket (alerts).";
-                    statusDiv.className = "status-disconnected";
+                    updateStatus("status-disconnected", "Что-то помешало подключению. Пробуем снова...");
                 };
 
                 socket.onclose = function(event) {
                     console.log("ОСНОВНОЙ СКРИПТ: WebSocket onclose. Код:", event.code, "Причина:", event.reason, "Было чисто:", event.wasClean);
-                    statusDiv.textContent = "Отключено от сервера алертов. Попытка переподключения через 5 сек...";
-                    statusDiv.className = "status-disconnected";
+                    updateStatus("status-disconnected", "Потеряли связь. Переподключимся через 5 секунд...");
                     setTimeout(connect, 5000);
                 };
             }
 
             function displayAlert(data) {
-							if (!alertsList) { /* ... проверка alertsList ... */ return; }
-							if (!data || !data.symbol) { /* ... проверка data ... */ return; }
+                if (!alertsList) { return; }
+                if (!data || !data.symbol) { return; }
 
-							const listItem = document.createElement("li");
-							listItem.classList.add("alert");
+                const listItem = document.createElement("li");
+                listItem.classList.add("alert");
 
-							const eventTime = new Date(data.timestamp).toLocaleString('ru-RU');
+                const eventTime = new Date(data.timestamp).toLocaleString('ru-RU');
 
-							const originalBinanceTicker = data.symbol;
-							const tickerForTradingViewUrl = `${originalBinanceTicker}.P`;
-							const tradingViewSymbolParam = `BINANCE:${tickerForTradingViewUrl}`;
-							const tradingViewUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tradingViewSymbolParam)}`;
+                const originalBinanceTicker = data.symbol;
+                const tickerForTradingViewUrl = `${originalBinanceTicker}.P`;
+                const tradingViewSymbolParam = `BINANCE:${tickerForTradingViewUrl}`;
+                const tradingViewUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tradingViewSymbolParam)}`;
 
-							// console.log(`displayAlert: Формирование ссылки для ${originalBinanceTicker} -> ${tradingViewUrl}`);
+                let movementText = "";
+                let movementClass = "";
 
-							let movementText = "";
-							let movementClass = "";
+                if (data.percentageChange > 0) {
+                    movementText = `выросла на <strong>${data.percentageChange.toFixed(2)}%</strong>`;
+                    movementClass = "price-rise";
+                } else if (data.percentageChange < 0) {
+                    movementText = `упала на <strong>${Math.abs(data.percentageChange).toFixed(2)}%</strong>`;
+                    movementClass = "price-fall";
+                } else {
+                    movementText = "осталась без изменений";
+                    movementClass = "price-neutral";
+                }
 
-							if (data.percentageChange > 0) {
-									movementText = `вырос на <strong>${data.percentageChange.toFixed(2)}%</strong>`;
-									movementClass = "price-rise";
-							} else if (data.percentageChange < 0) {
-									movementText = `упал на <strong>${Math.abs(data.percentageChange).toFixed(2)}%</strong>`; // Используем Math.abs для отображения
-									movementClass = "price-fall";
-							} else {
-									// Этот случай маловероятен для алерта, но для полноты
-									movementText = "не изменился"; 
-									movementClass = "price-neutral";
-							}
+                listItem.classList.add(movementClass);
 
-							listItem.classList.add(movementClass); 
-							if (movementClass === "price-rise") listItem.style.borderLeftColor = "#98c379"; // зеленый
-							if (movementClass === "price-fall") listItem.style.borderLeftColor = "#e06c75"; // красный
+                listItem.innerHTML = `
+                    <div class="alert-header">
+                        <span class="alert-title">Свежий сигнал</span>
+                        <a href="${tradingViewUrl}" target="_blank" class="alert-symbol" title="Открыть ${tickerForTradingViewUrl} на TradingView">${originalBinanceTicker}</a>
+                        <span class="alert-time">${eventTime}</span>
+                    </div>
+                    <div>
+                        Цена ${movementText} за последние 60 секунд.
+                    </div>
+                    <div class="alert-details">
+                        <span>Сейчас: <strong>${data.currentPrice.toFixed(4)}</strong></span>
+                        <span>Минуту назад: <strong>${data.oldestPrice.toFixed(4)}</strong></span>
+                    </div>
+                `;
 
-							listItem.innerHTML = `
-									<span class="alert-time">${eventTime}</span>
-									<div>
-											<strong>ВНИМАНИЕ!</strong> 
-											<a href="${tradingViewUrl}" target="_blank" class="alert-symbol" title="Открыть график ${tickerForTradingViewUrl} на TradingView">${originalBinanceTicker}</a> 
-											${movementText}!
-									</div>
-									<div class="alert-details">
-											Текущая цена: ${data.currentPrice.toFixed(4)}, Старая цена в окне: ${data.oldestPrice.toFixed(4)}
-									</div>
-							`;
+                alertsList.prepend(listItem);
 
-							alertsList.prepend(listItem);
+                while (alertsList.children.length > 50) {
+                    alertsList.removeChild(alertsList.lastChild);
+                }
+            }
 
-							while (alertsList.children.length > 50) {
-									alertsList.removeChild(alertsList.lastChild);
-							}
-						}
-            
             connect();
         });
     </script>

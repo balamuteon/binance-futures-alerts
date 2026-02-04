@@ -129,7 +129,8 @@
 			"fieldConfig": {
 				"defaults": {
 					"custom": {},
-					"mappings": []
+					"mappings": [],
+					"unit": "ms"
 				},
 				"overrides": []
 			},
@@ -152,13 +153,13 @@
 			"targets": [
 				{
 					"exemplar": true,
-					"expr": "rate(app_http_request_duration_seconds_sum[5m]) / rate(app_http_request_duration_seconds_count[5m])",
+					"expr": "1000 * histogram_quantile(0.95, sum(rate(app_http_request_duration_seconds_bucket[5m])) by (le, path))",
 					"interval": "",
 					"legendFormat": "{{path}}",
 					"refId": "A"
 				}
 			],
-			"title": "Среднее время ответа HTTP (p95)",
+			"title": "P95 время ответа HTTP (ms)",
 			"type": "timeseries"
 		}
 	],

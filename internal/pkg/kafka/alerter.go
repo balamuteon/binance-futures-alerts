@@ -24,14 +24,12 @@ func (ka *KafkaAlerter) Alert(symbol string, percentageChange float64, currentPr
 		Timestamp:        time.Now(),
 	}
 
-	// Кодируем алерт в JSON
 	jsonMsg, err := json.Marshal(alertMsg)
 	if err != nil {
 		log.Printf("[Generator] Ошибка кодирования алерта в JSON: %v", err)
 		return
 	}
 
-	// Отправляем JSON в топик system_alerts
 	err = ka.Writer.WriteMessages(context.Background(), kafkaGO.Message{
 		Value: jsonMsg,
 	})

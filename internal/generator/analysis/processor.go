@@ -37,7 +37,7 @@ func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 	pp.historyMutex.Lock()
 	defer pp.historyMutex.Unlock()
 
-	currentTimeMillis := time.Now().UnixMilli() // Для cooldown алертов
+	currentTimeMillis := time.Now().UnixMilli()
 
 	for _, ticker := range tickers {
 		currentPriceFloat, err := strconv.ParseFloat(ticker.ClosePrice, 64)
@@ -98,8 +98,6 @@ func (pp *PriceProcessor) Process(tickers []models.MiniTicker) {
 }
 
 func (pp *PriceProcessor) Close() error {
-	// Если у Alerter есть метод Close, вызываем его.
-	// Это потребует создания интерфейса с методом Close.
 	if closer, ok := pp.alerter.(interface{ Close() error }); ok {
 		return closer.Close()
 	}

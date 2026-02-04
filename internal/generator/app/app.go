@@ -24,7 +24,6 @@ const (
 	consumerGroup = "alert-generator-group"
 )
 
-// App инкапсулирует всю логику сервиса generator.
 type App struct {
 	cfg            *config.AppConfig
 	kafkaBroker    string
@@ -40,13 +39,11 @@ func New() (*App, error) {
 
 	cfg := config.Load()
 
-	// Убедимся, что топик для алертов существует
-	if err := kafka.EnsureTopicExists(context.Background(), kafkaBroker, producerTopic); err != nil {
+	if err := kafka.EnsureTopicExists(context.Background(), kafkaBroker, producerTopic, 1); err != nil {
 		return nil, fmt.Errorf("не удалось создать/проверить топик %s: %w", producerTopic, err)
 	}
 
 	kafkaWriter := kafka.NewWriter(producerTopic, kafkaBroker)
-	// defer kafkaWriter.Close() // Закрытие будет управляться в другом месте
 
 	kafkaAlerter := &kafka.KafkaAlerter{Writer: kafkaWriter}
 	priceProcessor := analysis.NewPriceProcessor(cfg, kafkaAlerter)
@@ -68,19 +65,15 @@ func (a *App) Run() {
 	wg.Add(1)
 	go a.runWorker(ctx, &wg)
 
-	// Ожидаем сигнал shutdown
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 	<-sigterm
 
 	log.Println("[Generator] Получен сигнал shutdown, завершение работы...")
 
-	// Сигнализируем воркеру о необходимости завершения
 	cancel()
-	// И ждем его полной остановки
 	wg.Wait()
 
-	// Закрываем Kafka writer здесь, после остановки воркера
 	if err := a.priceProcessor.Close(); err != nil {
 		log.Printf("[Generator] Ошибка при закрытии ресурсов PriceProcessor: %v", err)
 	}
@@ -121,7 +114,6 @@ func (a *App) runWorker(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// processMessages содержит внутренний цикл чтения сообщений.
 func (a *App) processMessages(ctx context.Context, reader *kafka.KafkaReader) {
 	for {
 		msg, err := reader.Reader.ReadMessage(ctx)
@@ -131,21 +123,20 @@ func (a *App) processMessages(ctx context.Context, reader *kafka.KafkaReader) {
 			} else {
 				log.Printf("[Generator] Ошибка чтения из Kafka: %v. Попытка пересоздать reader.", err)
 			}
-			return // Выходим из этой функции, чтобы внешний цикл пересоздал ридер
+			return
 		}
 
-		var tickers []models.MiniTicker
-		if err := json.Unmarshal(msg.Value, &tickers); err != nil {
+		var ticker models.MiniTicker
+		if err := json.Unmarshal(msg.Value, &ticker); err != nil {
 			if bytes.HasPrefix(msg.Value, []byte(`{"result":`)) {
-				log.Println("[Ingestor] Получено и проигнорировано сообщение-подтверждение от Binance.")
+				log.Println("[Generator] Получено и проигнорировано сообщение-подтверждение от Binance.")
 				continue
 			}
+
 			log.Printf("[Generator] Не удалось распарсить сообщение: %s", string(msg.Value))
 			continue
 		}
 
-		if len(tickers) > 0 {
-			a.priceProcessor.Process(tickers)
-		}
+		a.priceProcessor.Process([]models.MiniTicker{ticker})
 	}
 }

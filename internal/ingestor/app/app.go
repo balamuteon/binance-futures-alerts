@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -12,12 +14,16 @@ import (
 
 	"binance/internal/pkg/config"
 	"binance/internal/pkg/kafka"
+	"binance/internal/pkg/models"
 	websocketclient "binance/internal/pkg/webSocketClient"
 
 	kafkaGO "github.com/segmentio/kafka-go"
 )
 
-const topic = "raw_tickers"
+const (
+	topic                = "raw_tickers"
+	rawTickersPartitions = 12
+)
 
 // App инкапсулирует всю логику сервиса ingestor.
 type App struct {
@@ -33,10 +39,9 @@ func New() (*App, error) {
 		return nil, fmt.Errorf("адрес Kafka-брокера не может быть пустым")
 	}
 
-	// Ожидание готовности Kafka с таймаутом
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := ensureKafkaTopic(ctx, kafkaBroker, topic); err != nil {
+	if err := ensureKafkaTopic(ctx, kafkaBroker, topic, rawTickersPartitions); err != nil {
 		return nil, err
 	}
 
@@ -52,23 +57,18 @@ func (a *App) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
-	// Запускаем нашего воркера, который будет подключаться к Binance
 	wg.Add(1)
 	go a.runConnectionManager(ctx, &wg)
 
-	// Ожидаем сигнала прерывания (Ctrl+C)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("[Ingestor] Получен сигнал прерывания, начинаем graceful shutdown...")
 
-	// Даем команду на завершение всем горутинам
 	cancel()
-	// И ждем их полной остановки
 	wg.Wait()
 
-	// Корректно закрываем Kafka writer после того, как все горутины завершились
 	if err := a.kafkaWriter.Close(); err != nil {
 		log.Printf("[Ingestor] Ошибка при закрытии Kafka writer: %v", err)
 	}
@@ -76,13 +76,10 @@ func (a *App) Run() {
 	log.Println("[Ingestor] Приложение корректно завершено.")
 }
 
-// runConnectionManager управляет жизненным циклом подключения к WebSocket Binance.
 func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// Бесконечный цикл для автоматического переподключения
 	for {
-		// Перед каждой новой попыткой проверяем, не пора ли завершать работу.
 		select {
 		case <-ctx.Done():
 			log.Println("[Ingestor] Контекст отменен, менеджер подключений завершает работу.")
@@ -105,7 +102,6 @@ func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 		messagesChan, errsChan := client.ReadMessages(ctx)
 		log.Println("[Ingestor] Успешно подключились и подписались. Начинаем читать сообщения от Binance...")
 
-		// Запускаем внутренний цикл обработки сообщений для текущей сессии
 		err = a.processMessages(ctx, messagesChan, errsChan)
 		if err != nil {
 			log.Printf("[Ingestor] Сессия прервана из-за ошибки: %v", err)
@@ -114,7 +110,6 @@ func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 		client.Close()
 		log.Println("[Ingestor] Сессия завершена. Переподключение через 5 секунд...")
 
-		// Пауза перед переподключением с возможностью немедленного выхода
 		select {
 		case <-ctx.Done():
 			return
@@ -123,7 +118,6 @@ func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// processMessages читает из каналов сообщений и ошибок и отправляет данные в Kafka.
 func (a *App) processMessages(ctx context.Context, messages <-chan []byte, errs <-chan error) error {
 	for {
 		select {
@@ -132,10 +126,39 @@ func (a *App) processMessages(ctx context.Context, messages <-chan []byte, errs 
 				return fmt.Errorf("канал сообщений был закрыт")
 			}
 
-			// Передаем контекст в WriteMessages, чтобы он тоже мог быть прерван
-			err := a.kafkaWriter.WriteMessages(ctx, kafkaGO.Message{Value: msg})
+			var tickers []models.MiniTicker
+			if err := json.Unmarshal(msg, &tickers); err != nil {
+				if bytes.HasPrefix(msg, []byte(`{"result":`)) {
+					log.Println("[Ingestor] Получено и проигнорировано сообщение-подтверждение от Binance.")
+					continue
+				}
+				log.Printf("[Ingestor] Не удалось распарсить сообщение: %s", string(msg))
+				continue
+			}
+
+			if len(tickers) == 0 {
+				continue
+			}
+
+			kafkaMessages := make([]kafkaGO.Message, 0, len(tickers))
+			for _, ticker := range tickers {
+				payload, err := json.Marshal(ticker)
+				if err != nil {
+					log.Printf("[Ingestor] Ошибка кодирования тикера %s в JSON: %v", ticker.Symbol, err)
+					continue
+				}
+				kafkaMessages = append(kafkaMessages, kafkaGO.Message{
+					Key:   []byte(ticker.Symbol),
+					Value: payload,
+				})
+			}
+
+			if len(kafkaMessages) == 0 {
+				continue
+			}
+
+			err := a.kafkaWriter.WriteMessages(ctx, kafkaMessages...)
 			if err != nil {
-				// Если запись в Kafka не удалась, это критично. Разрываем сессию.
 				return fmt.Errorf("ошибка записи в Kafka: %w", err)
 			}
 
@@ -152,10 +175,9 @@ func (a *App) processMessages(ctx context.Context, messages <-chan []byte, errs 
 	}
 }
 
-// ensureKafkaTopic - вспомогательная функция для ожидания готовности топика.
-func ensureKafkaTopic(ctx context.Context, kafkaBroker, topic string) error {
+func ensureKafkaTopic(ctx context.Context, kafkaBroker, topic string, partitions int) error {
 	for {
-		err := kafka.EnsureTopicExists(ctx, kafkaBroker, topic)
+		err := kafka.EnsureTopicExists(ctx, kafkaBroker, topic, partitions)
 		if err == nil {
 			log.Printf("[Ingestor] Топик Kafka '%s' готов.", topic)
 			return nil

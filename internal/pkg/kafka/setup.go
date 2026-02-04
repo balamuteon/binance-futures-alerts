@@ -39,7 +39,7 @@ func NewReader(kafkaBroker []string, groupId, topic string, opts ...ReaderOption
 		opt(&config)
 	}
 
-	return KafkaReader{Reader: kafkaGO.NewReader(config)} 
+	return KafkaReader{Reader: kafkaGO.NewReader(config)}
 }
 
 func WithMinBytes(minBytes int) ReaderOption {
@@ -54,11 +54,12 @@ func WithMaxBytes(maxBytes int) ReaderOption {
 	}
 }
 
-
-func EnsureTopicExists(ctx context.Context, kafkaBroker, topicName string) error {
+func EnsureTopicExists(ctx context.Context, kafkaBroker, topicName string, partitions int) error {
 	log.Printf("Проверка и создание топика '%s' на брокере %s...", topicName, kafkaBroker)
+	if partitions <= 0 {
+		partitions = 1
+	}
 
-	// Используем Dial, а не DialLeader, так как нам нужен любой брокер для получения метаданных
 	conn, err := kafkaGO.Dial("tcp", kafkaBroker)
 	if err != nil {
 		return err
@@ -79,16 +80,13 @@ func EnsureTopicExists(ctx context.Context, kafkaBroker, topicName string) error
 	topicConfigs := []kafkaGO.TopicConfig{
 		{
 			Topic:             topicName,
-			NumPartitions:     1,
-			ReplicationFactor: 1, // Для локального кластера из одного брокера
+			NumPartitions:     partitions,
+			ReplicationFactor: 1,
 		},
 	}
 
 	err = controllerConn.CreateTopics(topicConfigs...)
-	// Ошибка "Topic with this name already exists" (код 36) является нормальной, игнорируем ее.
-	// Для разных версий Kafka текст ошибки может отличаться, поэтому лучше проверять код ошибки.
 	if err != nil {
-		// Ошибка "Topic with this name already exists" является нормальной, игнорируем ее.
 		if err.Error() == "[36] Topic with this name already exists" {
 			log.Printf("[Ingestor] Топик '%s' уже существует.", topicName)
 			return nil

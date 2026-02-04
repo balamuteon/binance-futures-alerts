@@ -21,7 +21,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// App инкапсулирует все компоненты и зависимости сервиса gateway.
 type App struct {
 	httpServer  *http.Server
 	webAlerter  *alerter.WebAlerter
@@ -34,7 +33,7 @@ func New() (*App, error) {
 	if kafkaBroker == "" {
 		log.Fatal("[Gateway] Переменная окружения KAFKA_BROKER не установлена")
 	}
-	
+
 	webAlerter := alerter.NewWebAlerter()
 	handler := handlers.NewHandler(webAlerter)
 
@@ -55,10 +54,8 @@ func New() (*App, error) {
 
 // Run запускает все компоненты приложения и блокируется до получения сигнала завершения.
 func (a *App) Run() error {
-	// Канал для ошибок от горутин
 	errs := make(chan error, 1)
 
-	// Запуск HTTP-сервера
 	go func() {
 		log.Printf("[Gateway] Запуск HTTP сервера на порту: %s", a.httpServer.Addr)
 		if err := a.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -66,10 +63,8 @@ func (a *App) Run() error {
 		}
 	}()
 
-	// Запуск Kafka консюмера
 	go a.runKafkaConsumer(errs)
 
-	// Ожидание сигнала завершения
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -89,7 +84,6 @@ func (a *App) shutdown() error {
 	a.webAlerter.Shutdown()
 	log.Println("[Gateway] WebAlerter остановлен.")
 
-	// Останавливаем HTTP сервер
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := a.httpServer.Shutdown(shutdownCtx); err != nil {
@@ -146,7 +140,7 @@ func (a *App) ensureKafkaTopic(topic string) error {
 	defer cancel()
 
 	for {
-		err := kafka.EnsureTopicExists(ctx, a.kafkaBroker, topic)
+		err := kafka.EnsureTopicExists(ctx, a.kafkaBroker, topic, 1)
 		if err == nil {
 			log.Printf("[Gateway] Топик '%s' готов для работы.", topic)
 			return nil

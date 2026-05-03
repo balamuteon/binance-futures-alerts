@@ -1,6 +1,10 @@
 services:
   kafka:
-    image: 'public.ecr.aws/bitnami/kafka:3.7.0'
+    # Public ECR pulls for this image can fail with EOF from CloudFront.
+    # Use the Docker Hub legacy mirror, which keeps the same Bitnami layout/env vars.
+    image: 'bitnamilegacy/kafka:3.7.0'
+    # Keep amd64 enabled for Apple Silicon hosts; this tag is not reliably available as arm64.
+    platform: linux/amd64
     container_name: kafka
     ports:
       - '9092:9092'

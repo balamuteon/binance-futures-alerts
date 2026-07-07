@@ -98,9 +98,23 @@ func (a *App) runConnectionManager(ctx context.Context, wg *sync.WaitGroup) {
 			continue
 		}
 
-		client.Subscribe(a.cfg.StreamName, 1)
+		if a.cfg.StreamName != "" {
+			if _, err := client.Subscribe(a.cfg.StreamName, 1); err != nil {
+				client.Close()
+				log.Printf("[Ingestor] Ошибка подписки на stream %s: %v. Повторная попытка через 5с.", a.cfg.StreamName, err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(5 * time.Second):
+				}
+				continue
+			}
+		} else {
+			log.Println("[Ingestor] Используется raw WebSocket stream без отдельной SUBSCRIBE-команды.")
+		}
+
 		messagesChan, errsChan := client.ReadMessages(ctx)
-		log.Println("[Ingestor] Успешно подключились и подписались. Начинаем читать сообщения от Binance...")
+		log.Println("[Ingestor] Успешно подключились к потоку Binance. Начинаем читать сообщения...")
 
 		err = a.processMessages(ctx, messagesChan, errsChan)
 		if err != nil {

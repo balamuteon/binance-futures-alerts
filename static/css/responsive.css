@@ -1,0 +1,175 @@
+@media (max-width: 720px) {
+    body {
+        padding: 24px 16px;
+    }
+
+    .app-shell {
+        height: calc(100dvh - 48px);
+        max-height: calc(100dvh - 48px);
+        padding: 28px 24px;
+        border-radius: 24px;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .info-tooltip {
+        right: 0;
+        left: auto;
+        width: min(320px, calc(100vw - 80px));
+        max-height: min(360px, calc(100dvh - 220px));
+        overflow-y: auto;
+    }
+
+    #alertsList {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+    }
+
+    .content {
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 20px;
+        overflow: hidden;
+    }
+
+    .alerts-area {
+        flex: 1 1 auto;
+        gap: 20px;
+    }
+
+    .actions {
+        flex: 0 0 auto;
+    }
+
+    .app-shell--chart-open {
+        width: min(960px, 100%);
+    }
+
+    .app-shell--chart-open .content {
+        flex-direction: column;
+    }
+
+    .app-shell--chart-open .alerts-area {
+        flex: 1 1 auto;
+        max-width: 100%;
+        transform: none;
+    }
+
+    .chart-panel {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        z-index: 6;
+        flex: none;
+        width: auto;
+        height: min(74dvh, calc(100% - 32px));
+        max-width: none;
+        opacity: 0;
+        transform: translateY(calc(100% + 24px));
+        transition: opacity 0.24s ease, transform 0.32s ease;
+    }
+
+    .chart-panel[aria-hidden="true"] {
+        height: 0;
+        align-self: auto;
+    }
+
+    .app-shell--chart-open .chart-panel {
+        flex: none;
+        height: min(74dvh, calc(100% - 32px));
+        max-width: none;
+        align-self: auto;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .chart-panel__controls {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .chart-panel__close {
+        order: 2;
+    }
+
+    .chart-panel__container {
+        height: 100%;
+        min-height: 0;
+        padding: 18px;
+        border-radius: 22px;
+        gap: 12px;
+    }
+
+    .chart-panel__frame {
+        flex: 1 1 auto;
+        min-height: 0;
+        border-radius: 16px;
+    }
+
+    .alert {
+        border-radius: 16px;
+        padding: 16px 18px;
+    }
+
+    .subtitle {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 420px) {
+    h1 {
+        font-size: 24px;
+    }
+
+    .subtitle {
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .status {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    .status::before {
+        width: 8px;
+        height: 8px;
+    }
+
+    .alert {
+        font-size: 14px;
+    }
+
+    .alert-title {
+        font-size: 12px;
+    }
+
+    .alert-time {
+        font-size: 11px;
+    }
+
+    .alert-details {
+        font-size: 12px;
+    }
+
+    .actions button,
+    #enableSoundButton {
+        font-size: 13px;
+    }
+
+    .chart-panel__symbol {
+        font-size: 20px;
+    }
+
+    .info-tooltip {
+        width: calc(100vw - 80px);
+        font-size: 13px;
+    }
+}

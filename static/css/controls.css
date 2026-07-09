@@ -1,0 +1,91 @@
+.actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+button,
+#enableSoundButton {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.6));
+    color: var(--text-primary);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 14px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+button:hover,
+#enableSoundButton:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 30px rgba(8, 47, 73, 0.35);
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(14, 165, 233, 0.8));
+}
+
+button:active,
+#enableSoundButton:active {
+    transform: translateY(0);
+}
+
+.info-panel {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.info-trigger {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 16px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.6), rgba(15, 23, 42, 0.6));
+    color: var(--text-primary);
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 700;
+    cursor: help;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    backdrop-filter: blur(18px);
+}
+
+.info-trigger:hover,
+.info-trigger:focus {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(8, 47, 73, 0.5);
+}
+
+.info-tooltip {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 18px;
+    padding: 18px 22px;
+    width: min(320px, 80vw);
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 22px 40px rgba(8, 47, 73, 0.45);
+}
+
+.info-tooltip strong {
+    color: var(--text-primary);
+}
+
+.info-trigger:hover + .info-tooltip,
+.info-trigger:focus + .info-tooltip {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+}

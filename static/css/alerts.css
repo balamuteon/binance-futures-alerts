@@ -1,0 +1,142 @@
+#alertsList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: clamp(0px, calc(100dvh - 360px), 540px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+#alertsList::-webkit-scrollbar {
+    width: 8px;
+}
+
+#alertsList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#alertsList::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.4);
+    border-radius: 999px;
+}
+
+.alert {
+    background: rgba(15, 23, 42, 0.76);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-left: 6px solid var(--accent);
+    border-radius: 18px;
+    padding: 18px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 12px 30px rgba(8, 47, 73, 0.24);
+    position: relative;
+    overflow: hidden;
+    flex: 0 0 auto;
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.alert::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.09), rgba(236, 72, 153, 0.04));
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.alert:hover::after {
+    opacity: 1;
+}
+
+.alert:hover,
+.alert:focus-visible {
+    border-top-color: rgba(56, 189, 248, 0.3);
+    border-right-color: rgba(56, 189, 248, 0.3);
+    border-bottom-color: rgba(56, 189, 248, 0.3);
+    box-shadow: 0 16px 34px rgba(8, 47, 73, 0.32);
+}
+
+.alert:focus-visible {
+    outline: 2px solid rgba(56, 189, 248, 0.52);
+    outline-offset: 3px;
+}
+
+.alert > div {
+    position: relative;
+    z-index: 1;
+}
+
+.alert-symbol {
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.alert-symbol:hover {
+    color: var(--accent-strong);
+}
+
+.alert-details {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.alert-time {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    font-weight: 600;
+}
+
+.alert-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.alert-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.alert-title::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.price-rise {
+    border-left-color: var(--success);
+}
+
+.price-fall {
+    border-left-color: var(--danger);
+}
+
+.price-neutral {
+    border-left-color: var(--neutral);
+}
+
+.alert-symbol--active {
+    color: var(--text-primary);
+    text-shadow: 0 0 16px rgba(56, 189, 248, 0.55);
+}

@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Binance Futures Alerts</title>
+    <link rel="icon" href="assets/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
     <div class="app-shell">
@@ -33,7 +34,7 @@
 
                 <div class="actions">
                     <button type="button" id="testSoundButton">Послушать тестовый сигнал</button>
-                    <audio id="testAudioPlayer" src="alert.wav" preload="auto"></audio>
+                    <audio id="testAudioPlayer" src="assets/alert.wav" preload="auto"></audio>
                 </div>
             </section>
             <aside id="chartPanel" class="chart-panel" aria-hidden="true">
@@ -54,6 +55,6 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -35,6 +35,30 @@
 
 Проект имеет четкую структуру, разделяющую код по сервисам и областям ответственности.
 
+Фронтенд находится в `static` и не требует отдельной сборки:
+
+```text
+static/
+├── assets/
+│   ├── alert.wav
+│   └── favicon.ico
+├── css/
+│   ├── main.css
+│   ├── foundation.css
+│   ├── alerts.css
+│   ├── controls.css
+│   ├── chart-panel.css
+│   └── responsive.css
+├── js/
+│   ├── components/
+│   ├── services/
+│   ├── utils/
+│   └── main.js
+└── index.html
+```
+
+`main.js` связывает UI-компоненты с WebSocket-сервисом, а компоненты не зависят
+от деталей подключения к серверу.
 
 ## Установка и Запуск
 
